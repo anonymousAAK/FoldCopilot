@@ -28,6 +28,15 @@ v0.7: Therapeutic vertical packs
 - Antibody Pack (CDR identification, interface confidence)
 - Kinase Pack (ATP site, DFG motif, KLIFS cross-reference)
 - GPCR Pack (TM helix confidence, membrane orientation context)
+
+v0.8: Education mode
+- Plain-language explanations of pLDDT, PAE, hallucinations
+- Targeted at wet-lab biologists, not bioinformaticians
+
+v0.9: Benchmarking harness
+- Evaluate predictions against experimental structures
+- GDT-TS, CA-RMSD, pLDDT calibration per bucket
+- Batch evaluation and publication-ready reports
 """
 
 from __future__ import annotations
@@ -36,7 +45,10 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from foldcopilot.tools import afdb, annotations, confidence, ensemble, foldseek, predict, verticals
+from foldcopilot.tools import (
+    afdb, annotations, benchmarks, confidence, education, ensemble,
+    foldseek, predict, verticals,
+)
 
 mcp = FastMCP(
     "FoldCopilot",
@@ -456,6 +468,157 @@ async def analyze_gpcr(
     Example: analyze_gpcr("P08172") for human muscarinic M2 receptor.
     """
     return await verticals.gpcr_analysis(uniprot_id)
+
+
+# --- Education Mode (v0.8) ---
+
+
+@mcp.tool()
+def explain_score(
+    score: Annotated[float, "pLDDT score (0-100) to explain"],
+) -> dict:
+    """Explain a pLDDT score in plain language for wet-lab biologists.
+
+    Returns an actionable interpretation with:
+    - What the score means in practical terms
+    - What you should and shouldn't do with this region
+    - A real-world analogy (crystal structure resolution equivalent)
+    - Citation for further reading
+
+    Use this when a biologist asks "what does pLDDT 73 mean?" or
+    "can I trust this region?"
+
+    Example: explain_score(73.5)
+    """
+    return education.explain_plddt(score)
+
+
+@mcp.tool()
+def explain_pae_score(
+    mean_pae: Annotated[float, "Mean PAE value in Angstroms"],
+    context: Annotated[str, "Context: 'general', 'interface', or 'domain'"] = "general",
+) -> dict:
+    """Explain a PAE (Predicted Aligned Error) value in plain language.
+
+    Translates the abstract Angstrom value into actionable guidance:
+    - Can you trust domain arrangements?
+    - Is this protein-protein interface reliable?
+    - Should you analyze domains separately?
+
+    Example: explain_pae_score(15.3, context="interface")
+    """
+    return education.explain_pae(mean_pae, context)
+
+
+@mcp.tool()
+def explain_hallucination(
+    af_plddt: Annotated[float, "AlphaFold pLDDT in the flagged region"],
+    idr_source: Annotated[str, "Source database: 'disprot' or 'mobidb'"],
+    severity: Annotated[str, "Severity: 'high' or 'moderate'"],
+) -> dict:
+    """Explain a hallucination warning in plain language.
+
+    When assess_confidence flags a region where AlphaFold predicts order
+    but IDR databases say disorder, use this tool to get a clear,
+    actionable explanation of what went wrong and what to do about it.
+
+    Example: explain_hallucination(85.0, "disprot", "high")
+    """
+    return education.explain_hallucination_warning(af_plddt, idr_source, severity)
+
+
+@mcp.tool()
+def explain_report(
+    confidence_report: Annotated[dict, "Output from assess_confidence tool"],
+) -> dict:
+    """Translate a full ConfidenceReport into plain-language summary.
+
+    Takes the structured JSON output from assess_confidence and produces
+    a human-readable interpretation with:
+    - Overall verdict (HIGH / MODERATE / LOW / VERY LOW confidence)
+    - Plain-language pLDDT and PAE explanations
+    - Hallucination warning summaries
+    - Bottom-line recommendation
+
+    Use this after assess_confidence when the user is a wet-lab biologist
+    who needs actionable guidance, not raw numbers.
+
+    Example: explain_report(assess_confidence("P04637"))
+    """
+    return education.explain_confidence_report(confidence_report)
+
+
+# --- Benchmarking Harness (v0.9) ---
+
+
+@mcp.tool()
+def list_benchmarks() -> dict:
+    """List available benchmark datasets for prediction evaluation.
+
+    Returns built-in datasets (DisProt hallucination set, CASP16 monomers)
+    and the option to use custom user-provided PDB pairs.
+    """
+    return benchmarks.list_benchmark_datasets()
+
+
+@mcp.tool()
+def benchmark_prediction(
+    predicted_pdb: Annotated[str, "Predicted structure PDB content"],
+    reference_pdb: Annotated[str, "Experimental reference PDB content"],
+    target_name: Annotated[str, "Name/ID of the target"] = "target",
+) -> dict:
+    """Evaluate a single prediction against an experimental structure.
+
+    Computes:
+    - CA-RMSD (global backbone accuracy)
+    - GDT-TS (Global Distance Test — fraction within 1/2/4/8 Angstroms)
+    - pLDDT calibration (is high-confidence actually accurate?)
+    - Per-residue distance distribution
+    - Accuracy breakdown by pLDDT bucket
+
+    Use this to validate predictions before publishing or making decisions.
+
+    Example: benchmark_prediction(boltz2_output, crystal_structure, "my_kinase")
+    """
+    return benchmarks.evaluate_structure_pair(predicted_pdb, reference_pdb, target_name)
+
+
+@mcp.tool()
+def benchmark_batch(
+    pairs: Annotated[
+        list[dict],
+        "List of {predicted_pdb: str, reference_pdb: str, target_name: str} dicts"
+    ],
+) -> dict:
+    """Evaluate a batch of predictions against experimental structures.
+
+    Runs benchmark_prediction on each pair and computes aggregate statistics:
+    - Mean/median RMSD and GDT-TS across all targets
+    - Best and worst targets
+    - pLDDT calibration across the dataset
+
+    Use this for systematic backend evaluation or paper benchmarks.
+    """
+    return benchmarks.evaluate_batch(pairs)
+
+
+@mcp.tool()
+def generate_report(
+    batch_results: Annotated[dict, "Output from benchmark_batch"],
+    dataset_name: Annotated[str, "Dataset name (e.g., 'casp16_monomers', 'custom')"] = "custom",
+    backend_name: Annotated[str, "Backend that produced the predictions"] = "unknown",
+) -> dict:
+    """Generate a publication-ready benchmark report.
+
+    Formats batch evaluation results into a structured report suitable for:
+    - JOSS paper supplementary data
+    - bioRxiv preprint tables
+    - Zenodo dataset metadata
+    - Public leaderboard entries
+
+    Includes pLDDT calibration analysis (does pLDDT actually predict accuracy?).
+    """
+    return benchmarks.generate_benchmark_report(batch_results, dataset_name, backend_name)
 
 
 def main():
