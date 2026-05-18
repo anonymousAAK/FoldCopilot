@@ -18,6 +18,16 @@ v0.4: Ensemble + cross-model disagreement
 - Compare structures from multiple backends
 - Per-residue agreement classification
 - Disagreement span detection — the second moat
+
+v0.6: AlphaMissense + AlphaFill
+- Missense variant pathogenicity landscape
+- Cofactor/ligand transplantation from experimental structures
+- Combined annotation pipeline
+
+v0.7: Therapeutic vertical packs
+- Antibody Pack (CDR identification, interface confidence)
+- Kinase Pack (ATP site, DFG motif, KLIFS cross-reference)
+- GPCR Pack (TM helix confidence, membrane orientation context)
 """
 
 from __future__ import annotations
@@ -26,7 +36,7 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from foldcopilot.tools import afdb, confidence, ensemble, foldseek, predict
+from foldcopilot.tools import afdb, annotations, confidence, ensemble, foldseek, predict, verticals
 
 mcp = FastMCP(
     "FoldCopilot",
@@ -331,6 +341,121 @@ async def compare_prediction_files(
         model_a_name, model_b_name,
         plddt_threshold, distance_threshold,
     )
+
+
+# --- Annotation Tools (v0.6) ---
+
+
+@mcp.tool()
+async def get_missense_landscape(
+    uniprot_id: Annotated[str, "UniProt accession (e.g., P04637)"],
+) -> dict:
+    """Get AlphaMissense pathogenicity landscape for a protein.
+
+    AlphaMissense predicts pathogenicity of all possible single amino acid
+    substitutions. Returns per-residue mean pathogenicity scores and
+    variant-level classification (likely_pathogenic / likely_benign / ambiguous).
+
+    Use this to identify mutation-sensitive hotspots in a protein structure.
+
+    Example: get_missense_landscape("P04637") for human p53.
+    """
+    return await annotations.get_missense_landscape(uniprot_id)
+
+
+@mcp.tool()
+async def get_cofactors(
+    uniprot_id: Annotated[str, "UniProt accession"],
+) -> dict:
+    """Get AlphaFill transplanted cofactors, ligands, and metal ions.
+
+    AlphaFill transplants ligands from experimental PDB structures into
+    AlphaFold models based on structural homology. Returns compound type
+    (cofactor, metal_ion, nucleotide, ligand), source PDB, RMSD, and identity.
+
+    Use this to understand the biochemical context of a predicted structure.
+
+    Example: get_cofactors("P00520") for human ABL1 (expect ATP-site ligands).
+    """
+    return await annotations.get_cofactors(uniprot_id)
+
+
+@mcp.tool()
+async def get_full_annotation(
+    uniprot_id: Annotated[str, "UniProt accession"],
+) -> dict:
+    """Comprehensive annotation: AlphaMissense + AlphaFill combined.
+
+    One-prompt pipeline: structure -> cofactor transplantation -> missense
+    pathogenicity landscape. Also identifies cofactor-pathogenicity hotspots
+    where pathogenic variants cluster near cofactor binding sites.
+
+    Example: get_full_annotation("P00520")
+    """
+    return await annotations.get_full_annotation(uniprot_id)
+
+
+# --- Therapeutic Vertical Packs (v0.7) ---
+
+
+@mcp.tool()
+async def analyze_antibody(
+    heavy_chain: Annotated[str, "Heavy chain amino acid sequence"],
+    light_chain: Annotated[str | None, "Light chain sequence (omit for nanobodies/VHH)"] = None,
+    target_uniprot_id: Annotated[str | None, "UniProt ID of the antigen target"] = None,
+) -> dict:
+    """Antibody Pack — comprehensive antibody structure analysis.
+
+    Domain-specific analysis for antibody engineering:
+    - CDR identification (approximate Kabat numbering)
+    - CDR-specific confidence warnings (CDR-H3 is expected to be low-confidence)
+    - Target antigen confidence assessment (if UniProt ID provided)
+    - Recommendations for co-folding and experimental validation
+
+    Supports: IgG heavy+light, VHH/nanobodies (heavy only), Fab fragments.
+
+    Example: analyze_antibody("EVQLVES...", "DIQMTQS...", target_uniprot_id="P01308")
+    """
+    return await verticals.antibody_analysis(heavy_chain, light_chain, target_uniprot_id)
+
+
+@mcp.tool()
+async def analyze_kinase(
+    uniprot_id: Annotated[str, "UniProt accession of a kinase"],
+) -> dict:
+    """Kinase Pack — kinase-specific structural analysis.
+
+    Domain-specific analysis for kinase drug discovery:
+    - Confidence assessment focused on catalytic domain
+    - AlphaFill: ATP-site ligand transplantation (ATP, ADP, kinase inhibitors)
+    - AlphaMissense: mutation sensitivity of kinase domain
+    - DFG motif and activation loop context
+    - KLIFS cross-reference recommendations
+
+    Use with predict_affinity=True in predict_structure for binding prediction.
+
+    Example: analyze_kinase("P00519") for human ABL1.
+    """
+    return await verticals.kinase_analysis(uniprot_id)
+
+
+@mcp.tool()
+async def analyze_gpcr(
+    uniprot_id: Annotated[str, "UniProt accession of a GPCR"],
+) -> dict:
+    """GPCR Pack — G protein-coupled receptor analysis.
+
+    Domain-specific analysis for GPCR pharmacology:
+    - Transmembrane helix confidence (should be high; low is unusual)
+    - Loop region warnings (ICL3, N/C-termini often disordered)
+    - AlphaFill ligand transplantation
+    - AlphaMissense pathogenicity
+    - Membrane orientation context (TMalphaFold, OPM references)
+    - Activation state limitations of AF predictions
+
+    Example: analyze_gpcr("P08172") for human muscarinic M2 receptor.
+    """
+    return await verticals.gpcr_analysis(uniprot_id)
 
 
 def main():
