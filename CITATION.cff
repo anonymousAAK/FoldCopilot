@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: "FoldCopilot: Confidence-Aware Interpretation Copilot for Protein Structure Predictions"
+message: "If you use FoldCopilot in your research, please cite it using this metadata."
+type: software
+license: MIT
+authors:
+  - given-names: Adarsh
+repository-code: "https://github.com/adarsh/FoldCopilot"
+keywords:
+  - protein structure prediction
+  - alphafold
+  - mcp
+  - confidence assessment
+  - intrinsically disordered regions
+  - structural bioinformatics
+  - foldseek
+version: "0.1.0"
+date-released: "2026-05-18"
