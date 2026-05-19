@@ -7,7 +7,9 @@ interpretation logic.
 
 from __future__ import annotations
 
-from foldcopilot.clients import afdb_client, alphafill_client, alphamissense_client
+from foldcopilot.clients import (
+    afdb_client, alphafill_client, alphamissense_client, tmalphaFold_client,
+)
 from foldcopilot.tools import confidence, foldseek
 
 
@@ -225,11 +227,14 @@ async def gpcr_analysis(uniprot_id: str) -> dict:
         except Exception as e:
             result["missense"] = {"error": str(e)}
 
+    # TMalphaFold membrane context
+    try:
+        membrane = await tmalphaFold_client.get_membrane_context(uniprot_id)
+        result["membrane_context"] = membrane
+    except Exception as e:
+        result["membrane_context"] = {"error": str(e)}
+
     result["gpcr_context"] = {
-        "membrane_orientation": (
-            "Use TMalphaFold (tmalphafold.ttk.hu) for membrane orientation. "
-            "AlphaFold predictions do not include lipid bilayer context."
-        ),
         "activation_states": (
             "GPCRs can adopt active, inactive, and intermediate conformations. "
             "AlphaFold typically predicts one dominant conformation — it may not "

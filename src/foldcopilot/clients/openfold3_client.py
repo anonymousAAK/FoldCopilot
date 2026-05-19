@@ -89,8 +89,18 @@ def _parse_output(output_dir: Path) -> dict[str, Any]:
     return result
 
 
-async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
-    """Run OpenFold3 prediction locally."""
+async def predict_local(
+    prediction_input: PredictionInput,
+    af3_mode: bool = False,
+    aqaffinity_mode: bool = False,
+) -> PredictionResult:
+    """Run OpenFold3 prediction locally.
+
+    Args:
+        af3_mode: Use AF3 BYO-weights instead of OpenFold3 default weights.
+        aqaffinity_mode: Enable SandboxAQ affinity prediction head.
+    """
+    backend_label = "alphafold3" if af3_mode else ("aqaffinity" if aqaffinity_mode else "openfold3")
     job_id = str(uuid.uuid4())[:8]
     start_time = time.time()
 
@@ -99,12 +109,14 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
         return PredictionResult(
             job_id=job_id,
             status=JobStatus.FAILED,
-            backend="openfold3",
+            backend=backend_label,
             sequences=prediction_input.sequences,
             error_message=(
                 "OpenFold3 not found in PATH. Install from: "
                 "https://github.com/aqlaboratory/openfold3\n"
                 "Requires GPU + genetic databases. Apache-2.0 license."
+                + ("\nFor AF3 mode: supply your own AF3 weights (CC-BY-NC-SA 4.0)." if af3_mode else "")
+                + ("\nFor AQAffinity: requires SandboxAQ affinity head." if aqaffinity_mode else "")
             ),
         )
 
@@ -122,6 +134,11 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
             "--output_dir", str(output_dir),
         ]
 
+        if af3_mode:
+            cmd.extend(["--weights", "af3"])
+        if aqaffinity_mode:
+            cmd.extend(["--affinity_head", "aqaffinity"])
+
         if not prediction_input.use_msa:
             cmd.append("--no_msa")
 
@@ -138,7 +155,7 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
             return PredictionResult(
                 job_id=job_id,
                 status=JobStatus.FAILED,
-                backend="openfold3",
+                backend=backend_label,
                 sequences=prediction_input.sequences,
                 error_message=f"OpenFold3 exited with code {process.returncode}: {stderr.decode()[:500]}",
                 elapsed_seconds=round(elapsed, 1),
@@ -146,11 +163,13 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
 
         parsed = _parse_output(output_dir)
         manifest = ReproducibilityManifest.create(
-            backend="openfold3",
+            backend=backend_label,
             sequences=prediction_input.sequences,
             parameters={
                 "use_msa": prediction_input.use_msa,
                 "diffusion_samples": prediction_input.diffusion_samples,
+                "af3_mode": af3_mode,
+                "aqaffinity_mode": aqaffinity_mode,
             },
         )
 
@@ -160,7 +179,7 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
         return PredictionResult(
             job_id=job_id,
             status=JobStatus.COMPLETE,
-            backend="openfold3",
+            backend=backend_label,
             sequences=prediction_input.sequences,
             output_pdb_path=parsed.get("output_pdb_path"),
             output_cif_path=parsed.get("output_cif_path"),
@@ -175,7 +194,7 @@ async def predict_local(prediction_input: PredictionInput) -> PredictionResult:
         return PredictionResult(
             job_id=job_id,
             status=JobStatus.FAILED,
-            backend="openfold3",
+            backend=backend_label,
             sequences=prediction_input.sequences,
             error_message=str(e),
             elapsed_seconds=round(time.time() - start_time, 1),

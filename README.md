@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/MCP-Native-5A67D8?style=for-the-badge" alt="MCP Native" />
   <img src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" alt="MIT License" />
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
-  <img src="https://img.shields.io/badge/Backends-Boltz--2_|_OpenFold3_|_Chai--1-F59E0B?style=for-the-badge" alt="Backends" />
+  <img src="https://img.shields.io/badge/Backends-Boltz--2_|_OpenFold3_|_Chai--1_|_AF3_|_AQAffinity-F59E0B?style=for-the-badge" alt="Backends" />
 </p>
 
 <h1 align="center">FoldCopilot</h1>
@@ -53,10 +53,11 @@ FoldCopilot fixes this. It sits between prediction backends and the researcher, 
 
 | Project | Stars | What it does | What it doesn't do |
 |---|---|---|---|
-| ProteinMCP | ~4 | AF2-era protein engineering, 38 tools | No AF3, no confidence interpretation, no ensembling |
+| ProteinMCP | peer-reviewed (Protein Science 35(4):e70547, 2026) | AF2-era protein engineering, 38 tools | No AF3, no confidence interpretation, no ensembling |
 | AlphaFold-MCP-Server | 33 | AFDB REST lookup | Cannot run predictions, no interpretation |
 | ChatMol/molecule-mcp | ~85 | PyMOL/ChimeraX visualization | No prediction, no confidence |
 | BioinfoMCP | 38 tools | Classical NGS pipelines | Zero structure predictors |
+| BioMCP | ~new | PDB active site + disease-protein search (TypeScript) | No prediction, no confidence interpretation, no ensembling |
 | **FoldCopilot** | **New** | **Confidence interpretation + ensemble disagreement + 3 backends + Foldseek** | **This is the gap** |
 
 </details>
@@ -134,9 +135,9 @@ FoldCopilot will:
 
 | Tool | Description |
 |---|---|
-| `predict_structure` | Run predictions via Boltz-2 (MIT), OpenFold3 (Apache-2.0), or Chai-1 (Apache-2.0). BYO-compute. |
+| `predict_structure` | Run predictions via Boltz-2 (MIT), OpenFold3 (Apache-2.0), Chai-1 (Apache-2.0), AF3 (BYO-weights), AQAffinity. **Background task** with progress reporting. |
 | `check_backend_status` | Verify backend installation and GPU availability |
-| `list_prediction_backends` | All backends with license type and installation status |
+| `list_prediction_backends` | All 5 backends with license type and installation status |
 
 ### Ensemble Comparison (Moat 2)
 
@@ -145,39 +146,87 @@ FoldCopilot will:
 | `compare_predictions` | **Cross-model disagreement detection.** Feed two PDB outputs, get per-residue agreement classification, disagreement spans, RMSD, and pLDDT correlation. |
 | `compare_prediction_files` | Same as above, from file paths |
 
+### Annotations (AlphaMissense + AlphaFill)
+
+| Tool | Description |
+|---|---|
+| `get_missense_landscape` | AlphaMissense pathogenicity landscape — per-residue mutation sensitivity |
+| `get_cofactors` | AlphaFill transplanted cofactors, ligands, and metal ions |
+| `get_full_annotation` | Combined AlphaMissense + AlphaFill + cofactor-pathogenicity hotspots |
+
+### Therapeutic Vertical Packs
+
+| Tool | Description |
+|---|---|
+| `analyze_antibody` | **Antibody Pack** — CDR identification (Kabat), CDR-H3 confidence warnings, nanobody support |
+| `analyze_kinase` | **Kinase Pack** — ATP-site AlphaFill, AlphaMissense, DFG motif, KLIFS cross-reference |
+| `analyze_gpcr` | **GPCR Pack** — TM helix confidence, TMalphaFold membrane topology, activation state context |
+| `get_membrane_context` | TMalphaFold + OPM membrane orientation for transmembrane proteins |
+
+### Education Mode
+
+| Tool | Description |
+|---|---|
+| `explain_score` | Plain-language pLDDT explanation with analogies and citations |
+| `explain_pae_score` | PAE interpretation with domain/interface context |
+| `explain_hallucination` | Hallucination warning in plain language with action items |
+| `explain_report` | Translate a full ConfidenceReport into a human-readable verdict |
+
+### Benchmarking Harness
+
+| Tool | Description |
+|---|---|
+| `benchmark_prediction` | CA-RMSD, GDT-TS, pLDDT calibration against experimental structure |
+| `benchmark_batch` | Batch evaluation with aggregate statistics |
+| `generate_report` | Publication-ready benchmark report (JOSS, bioRxiv, Zenodo) |
+| `list_benchmarks` | Available benchmark datasets (DisProt, CASP16, custom) |
+
+### Reproducibility & Operations
+
+| Tool | Description |
+|---|---|
+| `export_notebook` | Export confidence analysis as a reproducible Jupyter notebook |
+| `export_benchmark_notebook` | Export benchmark results as a Jupyter notebook |
+| `check_fold_drift` | Scan stored predictions for backend version drift |
+| `check_prediction_drift` | Check a single prediction's manifest for drift |
+| `health` | Server health check — version, backends, cache status |
+
 ---
 
 ## Architecture
 
 ```
-                          +------------------+
-                          |   Claude / LLM   |
-                          +--------+---------+
-                                   |
-                              MCP Protocol
-                                   |
-                          +--------v---------+
-                          |   FoldCopilot    |
-                          |   MCP Server     |
-                          +--------+---------+
-                                   |
-                 +-----------------+-----------------+
-                 |                 |                 |
-        +--------v------+ +------v-------+ +-------v--------+
-        | Confidence    | | Foldseek     | | Prediction     |
-        | Interpreter   | | Search       | | Engine         |
-        +--------+------+ +------+-------+ +-------+--------+
-                 |                |                  |
-        +--------v------+ +------v-------+ +-------v--------+
-        | AFDB + DisProt| | Foldseek    | | Boltz-2        |
-        | + MobiDB      | | Web API     | | OpenFold3      |
-        +---------------+ +-------------+ | Chai-1         |
-                                           +----------------+
-                                                  |
-                                           +------v-------+
-                                           | Ensemble     |
-                                           | Comparator   |
-                                           +--------------+
+                              +------------------+
+                              |   Claude / LLM   |
+                              +--------+---------+
+                                       |
+                                  MCP Protocol (task=True for predictions)
+                                       |
+                              +--------v---------+
+                              |   FoldCopilot    |
+                              |   32 MCP Tools   |
+                              +--------+---------+
+                                       |
+          +----------+---------+-------+--------+-----------+
+          |          |         |                |            |
+   +------v---+ +---v----+ +-v--------+ +----v-----+ +---v--------+
+   |Confidence| |Foldseek| |Prediction| |Annotation| |Therapeutics|
+   |Interpret | |Search  | |Engine    | |Pipeline  | |Verticals   |
+   +------+---+ +---+----+ +-+--------+ +----+-----+ +---+--------+
+          |          |        |               |            |
+   +------v---+ +---v----+ +-v--------+ +----v-----+ +---v--------+
+   |AFDB      | |Foldseek| |Boltz-2   | |AlphaMiss.| |Antibody    |
+   |DisProt   | |Web API | |OpenFold3 | |AlphaFill | |Kinase      |
+   |MobiDB    | +--------+ |Chai-1    | +----------+ |GPCR        |
+   +----------+            |AF3 (BYO) |              |TMalphaFold |
+                            |AQAffinity|              +------------+
+                            +----+-----+
+                                 |
+                            +----v-------+     +------------+
+                            | Ensemble   |     | Education  |
+                            | Comparator |     | + Notebook |
+                            +------------+     | + Drift    |
+                                               +------------+
 ```
 
 ### Design Principles
@@ -198,13 +247,15 @@ FoldCopilot will:
 | **Boltz-2** | MIT | ~20s/GPU | Yes (Pearson r=0.66) | Default |
 | **OpenFold3** | Apache-2.0 | ~minutes | No | Commercial-safe AF3 |
 | **Chai-1** | Apache-2.0 | ~minutes | No | Multi-chain + ligands |
+| **AlphaFold 3** | CC-BY-NC-SA 4.0 | ~minutes | No | BYO-weights, non-commercial only |
+| **AQAffinity** | Open | ~minutes | Yes | SandboxAQ, on top of OpenFold3 |
 
 ### License Routing
 
 ```
-commercial_use=True  --> Boltz-2 (MIT) or OpenFold3 (Apache-2.0) or Chai-1 (Apache-2.0)
-commercial_use=False --> All backends available
-AF3 weights          --> NEVER auto-selected. BYO-weights + non-commercial attestation only.
+commercial_use=True  --> Boltz-2 (MIT) | OpenFold3 (Apache-2.0) | Chai-1 (Apache-2.0) | AQAffinity (Open)
+commercial_use=False --> All 5 backends available
+AF3 weights          --> NEVER auto-selected. BYO-weights + af3_noncommercial_attestation=True required.
 Chai-2               --> NOT supported. Closed API, ToS prohibits relay.
 ```
 
@@ -278,15 +329,22 @@ FoldCopilot's hallucination detection was developed against the dataset from [ar
 ### Test Coverage
 
 ```
-92 tests | 5 test modules | All passing
+175 tests | 12 test modules | All passing
 ```
 
 ```
-tests/test_confidence.py    15 tests  (pLDDT bucketing, span detection, hallucination)
-tests/test_foldseek.py      13 tests  (alignment parsing, UniProt extraction)
-tests/test_predict.py       17 tests  (license routing, manifests, I/O parsing)
-tests/test_ensemble.py      25 tests  (RMSD, agreement classification, span detection)
-tests/test_validation.py    22 tests  (sequence, UniProt, PDB input validation)
+tests/test_confidence.py       15 tests  (pLDDT bucketing, span detection, hallucination)
+tests/test_foldseek.py         13 tests  (alignment parsing, UniProt extraction)
+tests/test_predict.py          20 tests  (license routing, AF3 gate, validation, manifests)
+tests/test_ensemble.py         25 tests  (RMSD, agreement classification, span detection)
+tests/test_validation.py       22 tests  (sequence, UniProt, PDB input validation)
+tests/test_annotations.py      18 tests  (AlphaMissense, AlphaFill, hotspots)
+tests/test_verticals.py         8 tests  (Antibody CDR, Kinase, GPCR packs)
+tests/test_education.py        18 tests  (pLDDT/PAE/hallucination explanations)
+tests/test_benchmarks.py       10 tests  (GDT-TS, batch eval, reports)
+tests/test_notebook_export.py   7 tests  (confidence + benchmark notebook export)
+tests/test_fold_drift.py        6 tests  (drift detection, manifest scanning)
+tests/test_tmalphaFold.py       4 tests  (membrane topology, OPM, combined context)
 ```
 
 ---
@@ -298,11 +356,11 @@ tests/test_validation.py    22 tests  (sequence, UniProt, PDB input validation)
 - [x] **v0.3** Boltz-2 backend — MIT, 20s/GPU, affinity prediction, reproducibility manifests
 - [x] **v0.4** Ensemble disagreement — cross-model comparison, per-residue agreement, span detection
 - [x] **v0.5** OpenFold3 + Chai-1 backends, input validation, JOSS readiness
-- [ ] **v0.6** AlphaMissense + AlphaFill cofactor transplantation
-- [ ] **v0.7** Therapeutic vertical packs (Antibody, Kinase, GPCR)
-- [ ] **v0.8** Education mode (`--explain` flag for plain-language confidence reading)
-- [ ] **v0.9** Benchmarking harness (CASP16, Polaris-ASAP, DisProt hallucination set)
-- [ ] **v1.0** JOSS submission + Zenodo dataset DOI + public leaderboard
+- [x] **v0.6** AlphaMissense + AlphaFill cofactor transplantation + combined annotation pipeline
+- [x] **v0.7** Therapeutic vertical packs (Antibody, Kinase, GPCR) + TMalphaFold membrane context
+- [x] **v0.8** Education mode — plain-language pLDDT/PAE/hallucination explanations with analogies
+- [x] **v0.9** Benchmarking harness (CASP16, DisProt hallucination set) + AF3/AQAffinity backends + notebook export + fold-drift tracker + health endpoint
+- [ ] **v1.0** CI/CD + JOSS submission + Zenodo dataset DOI + public leaderboard
 
 ---
 
@@ -341,10 +399,10 @@ See also: [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 FoldCopilot is MIT-licensed and welcomes contributions. Areas of high impact:
 
-- **New backends** — Protenix, AQAffinity, ESMFold
-- **Database integrations** — AlphaMissense, AlphaFill, CATH, SCOP, SAbDab, KLIFS
-- **Therapeutic verticals** — Antibody, Kinase, GPCR domain packs
-- **Benchmarks** — CASP16, Polaris-ASAP evaluation sets
+- **New backends** — Protenix (Apache-2.0), ESMFold (MIT, fast single-sequence)
+- **Database integrations** — CATH, SCOP, SAbDab, PDBe-KB
+- **Wet-lab linkage** — Benchling / LabArchives ELN integration
+- **Benchmarks** — CASP16 experimental structures, Polaris-ASAP evaluation sets
 - **Wet-lab validation** — partner with us to validate predictions experimentally
 
 ```bash

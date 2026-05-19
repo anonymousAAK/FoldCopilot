@@ -27,6 +27,10 @@ async def get_disprot_regions(
     """Return DisProt disorder annotations for a UniProt accession.
 
     Returns list of dicts with keys: start, end, annotation, evidence_type.
+    When available (DisProt 2026 / IDPO), also includes optional keys:
+    - term_namespace: IDPO ontology namespace (e.g. "IDPO:00076")
+    - method: MIADE experimental/computational method
+    - conditions: MIADE experimental conditions
     Empty list if no DisProt entry exists.
     """
     cp = _cache_path(uniprot_id)
@@ -53,23 +57,35 @@ async def get_disprot_regions(
         regions = []
         for region in data.get("disprot_consensus", {}).get("structural_state", []):
             if region.get("type") in ("disorder", "D"):
-                regions.append({
+                entry: dict = {
                     "start": region["start"],
                     "end": region["end"],
                     "annotation": "disorder",
                     "evidence_type": "disprot_consensus",
-                })
+                }
+                if region.get("term_namespace"):
+                    entry["term_namespace"] = region["term_namespace"]
+                regions.append(entry)
 
         # Also check individual annotations
         for ann in data.get("regions", []):
             term = ann.get("term_name", "").lower()
             if "disorder" in term or "flexible" in term:
-                regions.append({
+                entry = {
                     "start": ann["start"],
                     "end": ann["end"],
                     "annotation": ann.get("term_name", "disorder"),
                     "evidence_type": ann.get("evidence_code", "unknown"),
-                })
+                }
+                # DisProt 2026: IDPO ontology namespace
+                if ann.get("term_namespace"):
+                    entry["term_namespace"] = ann["term_namespace"]
+                # DisProt 2026: MIADE evidence details
+                if ann.get("method"):
+                    entry["method"] = ann["method"]
+                if ann.get("conditions"):
+                    entry["conditions"] = ann["conditions"]
+                regions.append(entry)
 
         # Deduplicate by (start, end)
         seen = set()

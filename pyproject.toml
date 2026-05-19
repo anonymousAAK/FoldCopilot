@@ -28,6 +28,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tasks = [
+    "fastmcp[tasks]",
+]
+observability = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

@@ -43,12 +43,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
+
+# Background tasks require fastmcp[tasks] (Docket/Redis).
+# Graceful fallback: use task=True when available, regular tool otherwise.
+try:
+    import docket  # noqa: F401
+    _TASKS_AVAILABLE = True
+except ImportError:
+    _TASKS_AVAILABLE = False
 
 from foldcopilot.tools import (
     afdb, annotations, benchmarks, confidence, education, ensemble,
-    foldseek, predict, verticals,
+    fold_drift, foldseek, notebook_export, predict, verticals,
 )
+from foldcopilot.utils.validation import ValidationError, validate_uniprot_id, validate_pdb_content
 
 mcp = FastMCP(
     "FoldCopilot",
@@ -74,6 +83,10 @@ async def lookup_structure(uniprot_id: str) -> dict:
 
     Example: lookup_structure("P00520") for human ABL1.
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await afdb.lookup_structure(uniprot_id)
 
 
@@ -89,6 +102,10 @@ async def get_plddt_scores(uniprot_id: str) -> dict:
 
     Example: get_plddt_scores("P00520")
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await afdb.get_plddt(uniprot_id)
 
 
@@ -104,6 +121,10 @@ async def get_pae_summary(uniprot_id: str) -> dict:
 
     Example: get_pae_summary("P00520")
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await afdb.get_pae(uniprot_id)
 
 
@@ -132,6 +153,10 @@ async def assess_confidence(uniprot_id: str) -> dict:
 
     Example: assess_confidence("P53_HUMAN") or assess_confidence("P04637")
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await confidence.assess_confidence(uniprot_id)
 
 
@@ -162,6 +187,10 @@ async def foldseek_search(
 
     Example: foldseek_search(pdb_content="ATOM 1 CA ...", databases=["pdb100"])
     """
+    try:
+        validate_pdb_content(pdb_content)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await foldseek.search_structure(
         pdb_content, databases=databases, mode=mode, max_hits=max_hits
     )
@@ -219,16 +248,18 @@ async def find_confident_homologs(
 # --- Prediction Tools ---
 
 
-@mcp.tool()
+@mcp.tool(task=_TASKS_AVAILABLE or None)
 async def predict_structure(
     sequences: Annotated[list[str], "Amino acid sequences to fold (one per chain)"],
-    backend: Annotated[str, "Prediction backend: 'boltz2' (MIT), 'openfold3' (Apache-2.0), 'chai1' (Apache-2.0)"] = "boltz2",
+    backend: Annotated[str, "Prediction backend: 'boltz2' (MIT), 'openfold3' (Apache-2.0), 'chai1' (Apache-2.0), 'alphafold3' (BYO-weights, non-commercial), 'aqaffinity' (SandboxAQ)"] = "boltz2",
     commercial_use: Annotated[bool, "Set True if results will be used commercially. Enforces license routing."] = False,
+    af3_noncommercial_attestation: Annotated[bool, "Required for AF3: attest that use is non-commercial and weights are self-supplied."] = False,
     recycling_steps: Annotated[int, "Number of recycling steps (Boltz-2)"] = 3,
     sampling_steps: Annotated[int, "Number of diffusion sampling steps (Boltz-2)"] = 200,
     diffusion_samples: Annotated[int, "Number of diffusion samples to generate"] = 1,
     use_msa: Annotated[bool, "Use MSA (multiple sequence alignment). Slower but more accurate."] = True,
     predict_affinity: Annotated[bool, "Predict binding affinity (Boltz-2, requires 2+ chains)"] = False,
+    ctx: Context | None = None,
 ) -> dict:
     """Predict protein structure using a supported backend.
 
@@ -239,6 +270,8 @@ async def predict_structure(
     - boltz2 (MIT): ~20s/GPU, affinity prediction, fast default
     - openfold3 (Apache-2.0): AF3 reproduction, commercial-safe
     - chai1 (Apache-2.0): multi-chain, ligand support
+    - alphafold3 (CC-BY-NC-SA 4.0): BYO-weights only, non-commercial
+    - aqaffinity (Open): SandboxAQ affinity on top of OpenFold3
 
     Every prediction ships with a reproducibility manifest containing:
     model version, weights hash, input hash, parameters, runtime env.
@@ -248,21 +281,28 @@ async def predict_structure(
 
     Example: predict_structure(["MKFLILLFNILCLFPVLAADNHGVS..."])
     """
-    return await predict.predict_structure(
+    if ctx:
+        await ctx.report_progress(0, 4, message="Validating input and routing backend")
+    result = await predict.predict_structure(
         sequences=sequences,
         backend=backend,
         commercial_use=commercial_use,
+        af3_noncommercial_attestation=af3_noncommercial_attestation,
         recycling_steps=recycling_steps,
         sampling_steps=sampling_steps,
         diffusion_samples=diffusion_samples,
         use_msa=use_msa,
         predict_affinity=predict_affinity,
+        ctx=ctx,
     )
+    if ctx:
+        await ctx.report_progress(4, 4, message="Prediction complete")
+    return result
 
 
 @mcp.tool()
 def check_backend_status(
-    backend: Annotated[str, "Backend to check: 'boltz2', 'openfold3', 'chai1'"] = "boltz2",
+    backend: Annotated[str, "Backend to check: 'boltz2', 'openfold3', 'chai1', 'alphafold3', 'aqaffinity'"] = "boltz2",
 ) -> dict:
     """Check if a prediction backend is installed and ready.
 
@@ -372,6 +412,10 @@ async def get_missense_landscape(
 
     Example: get_missense_landscape("P04637") for human p53.
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await annotations.get_missense_landscape(uniprot_id)
 
 
@@ -389,6 +433,10 @@ async def get_cofactors(
 
     Example: get_cofactors("P00520") for human ABL1 (expect ATP-site ligands).
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await annotations.get_cofactors(uniprot_id)
 
 
@@ -404,6 +452,10 @@ async def get_full_annotation(
 
     Example: get_full_annotation("P00520")
     """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
     return await annotations.get_full_annotation(uniprot_id)
 
 
@@ -621,8 +673,142 @@ def generate_report(
     return benchmarks.generate_benchmark_report(batch_results, dataset_name, backend_name)
 
 
+# --- Membrane Orientation (TMalphaFold) ---
+
+
+@mcp.tool()
+async def get_membrane_context(
+    uniprot_id: Annotated[str, "UniProt accession of a transmembrane protein"],
+) -> dict:
+    """Get membrane topology and orientation for a transmembrane protein.
+
+    Combines TMalphaFold (predicted TM segments, tilt angle) with OPM
+    (experimental membrane boundaries). Essential for GPCR, ion channel,
+    and transporter analysis.
+
+    Returns transmembrane segment positions, membrane insertion angle,
+    and topology type.
+
+    Example: get_membrane_context("P08172") for muscarinic M2 receptor.
+    """
+    from foldcopilot.clients import tmalphaFold_client
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
+    return await tmalphaFold_client.get_membrane_context(uniprot_id)
+
+
+# --- Notebook Export ---
+
+
+@mcp.tool()
+def export_notebook(
+    uniprot_id: Annotated[str, "UniProt accession used in the analysis"],
+    confidence_report: Annotated[dict, "Output from assess_confidence tool"],
+) -> dict:
+    """Export a confidence analysis as a reproducible Jupyter notebook.
+
+    Generates a self-contained .ipynb that re-runs the analysis end-to-end,
+    including pLDDT visualization and the original FoldCopilot report.
+
+    Major citation multiplier — shareable, reproducible, publication-ready.
+
+    Example: export_notebook("P04637", assess_confidence("P04637"))
+    """
+    try:
+        uniprot_id = validate_uniprot_id(uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
+    return notebook_export.export_confidence_notebook(uniprot_id, confidence_report)
+
+
+@mcp.tool()
+def export_benchmark_notebook(
+    batch_results: Annotated[dict, "Output from benchmark_batch"],
+    dataset_name: Annotated[str, "Dataset name"] = "custom",
+    backend_name: Annotated[str, "Backend that produced predictions"] = "unknown",
+) -> dict:
+    """Export benchmark results as a reproducible Jupyter notebook.
+
+    Generates a .ipynb with summary stats, per-target plots, and full results.
+    """
+    return notebook_export.export_benchmark_notebook(batch_results, dataset_name, backend_name)
+
+
+# --- Fold-Drift Tracker ---
+
+
+@mcp.tool()
+def check_fold_drift(
+    prediction_dir: Annotated[str | None, "Custom prediction directory to scan. Default: ~/.cache/foldcopilot/predictions"] = None,
+) -> dict:
+    """Check stored predictions for fold drift.
+
+    Scans reproducibility manifests and compares the backend version used
+    at prediction time against the currently installed version. Flags
+    predictions that may produce different results if re-run.
+
+    Use this after updating backends to identify stale predictions.
+
+    Example: check_fold_drift()
+    """
+    return fold_drift.check_fold_drift(prediction_dir)
+
+
+@mcp.tool()
+def check_prediction_drift(
+    manifest_path: Annotated[str, "Path to a reproducibility_manifest.json file"],
+) -> dict:
+    """Check a single prediction's manifest for version drift.
+
+    Example: check_prediction_drift("~/.cache/foldcopilot/predictions/boltz_abc123/output/reproducibility_manifest.json")
+    """
+    return fold_drift.check_prediction_drift(manifest_path)
+
+
+# --- Health / Metrics ---
+
+
+@mcp.tool()
+def health() -> dict:
+    """Health check — server status, backend availability, version info.
+
+    Returns server version, registered tool count, backend installation
+    status, and cache directory info.
+    """
+    import foldcopilot
+
+    backend_status = {}
+    for backend_name in ["boltz2", "openfold3", "chai1", "alphafold3", "aqaffinity"]:
+        try:
+            status = predict.get_backend_status(backend_name)
+            backend_status[backend_name] = {
+                "installed": status.get("installed", False),
+                "gpu_available": status.get("gpu_available", False),
+            }
+        except Exception:
+            backend_status[backend_name] = {"installed": False, "gpu_available": False}
+
+    from pathlib import Path
+    cache_dir = Path.home() / ".cache" / "foldcopilot"
+
+    return {
+        "status": "healthy",
+        "version": foldcopilot.__version__,
+        "server": "FoldCopilot",
+        "backends": backend_status,
+        "cache_dir": str(cache_dir),
+        "cache_exists": cache_dir.exists(),
+    }
+
+
 def main():
     """Run the FoldCopilot MCP server."""
+    # Initialise OpenTelemetry tracing if the optional dependency is installed.
+    from foldcopilot.observability import setup_tracing
+    setup_tracing()
+
     mcp.run()
 
 

@@ -13,8 +13,10 @@ from pydantic import BaseModel, Field
 
 class PredictionBackend(str, Enum):
     BOLTZ2 = "boltz2"
-    OPENFOLD3 = "openfold3"  # v0.5
-    CHAI1 = "chai1"          # v0.5
+    OPENFOLD3 = "openfold3"
+    CHAI1 = "chai1"
+    AF3 = "alphafold3"       # BYO-weights only, non-commercial
+    AQAFFINITY = "aqaffinity"  # SandboxAQ, on top of OpenFold3
 
 
 class LicenseType(str, Enum):
@@ -27,6 +29,8 @@ BACKEND_LICENSES: dict[PredictionBackend, LicenseType] = {
     PredictionBackend.BOLTZ2: LicenseType.COMMERCIAL_OK,       # MIT
     PredictionBackend.OPENFOLD3: LicenseType.COMMERCIAL_OK,    # Apache-2.0
     PredictionBackend.CHAI1: LicenseType.COMMERCIAL_OK,        # Apache-2.0
+    PredictionBackend.AF3: LicenseType.NON_COMMERCIAL,         # CC-BY-NC-SA 4.0 + non-commercial weights
+    PredictionBackend.AQAFFINITY: LicenseType.COMMERCIAL_OK,   # Open
 }
 
 
@@ -43,6 +47,7 @@ class PredictionInput(BaseModel):
     sequences: list[str] = Field(..., min_length=1)
     backend: PredictionBackend = PredictionBackend.BOLTZ2
     commercial_use: bool = False
+    af3_noncommercial_attestation: bool = False  # Required for AF3
     # Boltz-2 specific
     recycling_steps: int = 3
     sampling_steps: int = 200

@@ -19,7 +19,7 @@ from foldcopilot.models.prediction import (
     PredictionInput,
     ReproducibilityManifest,
 )
-from foldcopilot.tools.predict import check_license_compatibility, list_backends
+from foldcopilot.tools.predict import check_license_compatibility, list_backends, predict_structure
 
 
 class TestLicenseRouting:
@@ -31,10 +31,29 @@ class TestLicenseRouting:
         err = check_license_compatibility(PredictionBackend.BOLTZ2, commercial=False)
         assert err is None
 
-    def test_all_current_backends_commercial_ok(self):
-        # All v0.3 backends are MIT/Apache
-        for backend in PredictionBackend:
+    def test_af3_noncommercial(self):
+        err = check_license_compatibility(PredictionBackend.AF3, commercial=True)
+        assert err is not None
+        assert "not licensed for commercial" in err
+
+    def test_af3_noncommercial_ok(self):
+        err = check_license_compatibility(PredictionBackend.AF3, commercial=False)
+        assert err is None
+
+    def test_aqaffinity_commercial_ok(self):
+        err = check_license_compatibility(PredictionBackend.AQAFFINITY, commercial=True)
+        assert err is None
+
+    def test_commercial_backends(self):
+        commercial_ok = [
+            PredictionBackend.BOLTZ2,
+            PredictionBackend.OPENFOLD3,
+            PredictionBackend.CHAI1,
+            PredictionBackend.AQAFFINITY,
+        ]
+        for backend in commercial_ok:
             assert BACKEND_LICENSES[backend] == LicenseType.COMMERCIAL_OK
+        assert BACKEND_LICENSES[PredictionBackend.AF3] == LicenseType.NON_COMMERCIAL
 
     def test_list_backends(self):
         result = list_backends()
@@ -43,7 +62,8 @@ class TestLicenseRouting:
         assert "boltz2" in names
         assert "openfold3" in names
         assert "chai1" in names
-        # All backends now implemented
+        assert "alphafold3" in names
+        assert "aqaffinity" in names
         for b in result["backends"]:
             assert b["implemented"] is True
 
@@ -88,6 +108,38 @@ class TestReproducibilityManifest:
         )
         data = json.loads(manifest.model_dump_json())
         assert data["backend"] == "boltz2"
+
+
+class TestAF3Gate:
+    @pytest.mark.asyncio
+    async def test_af3_requires_attestation(self):
+        result = await predict_structure(
+            sequences=["MKFLILLFNILCLFPVLAAD"],
+            backend="alphafold3",
+            af3_noncommercial_attestation=False,
+        )
+        assert result["status"] == "failed"
+        assert "af3_noncommercial_attestation" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_af3_rejects_commercial(self):
+        result = await predict_structure(
+            sequences=["MKFLILLFNILCLFPVLAAD"],
+            backend="alphafold3",
+            commercial_use=True,
+            af3_noncommercial_attestation=True,
+        )
+        assert result["status"] == "failed"
+        assert "not licensed for commercial" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_validation_rejects_bad_sequence(self):
+        result = await predict_structure(
+            sequences=["ABC"],  # too short
+            backend="boltz2",
+        )
+        assert result["status"] == "failed"
+        assert "too short" in result["error"].lower()
 
 
 class TestPredictionInput:
