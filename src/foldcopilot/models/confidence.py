@@ -82,6 +82,7 @@ class ConfidenceReport(BaseModel):
 
     caveats: list[str] = Field(default_factory=list)
 
+    af2_disorder_regions: list[dict] | None = None
     idr_strategy_note: str | None = None
     confidence_interpretation_note: str | None = None
 

@@ -81,6 +81,109 @@ async def antibody_analysis(
     return result
 
 
+async def antibody_design_guidance(
+    target_uniprot_id: str,
+    format: str = "VHH",  # "VHH", "VHH-Fc", "mAb"
+) -> dict:
+    """Antibody Design Pack — guidance for de novo antibody design campaigns.
+
+    Provides backend recommendations and expected hit rates based on
+    Protenix-v2 benchmarks (bioRxiv 2026.04.10.717613) and format-specific
+    considerations.
+
+    Args:
+        target_uniprot_id: UniProt ID of the target antigen.
+        format: Antibody format — VHH (nanobody), VHH-Fc, or mAb.
+    """
+    result: dict = {
+        "pack": "antibody_design",
+        "format": format,
+        "target_uniprot_id": target_uniprot_id,
+    }
+
+    # Assess target confidence if possible
+    try:
+        target_confidence = await confidence.assess_confidence(target_uniprot_id)
+        result["target_quality"] = {
+            "uniprot_id": target_uniprot_id,
+            "overall_mean_plddt": target_confidence.get("overall_mean_plddt"),
+            "hallucination_count": len(
+                target_confidence.get("hallucination_warnings", [])
+            ),
+            "note": (
+                "Higher target pLDDT generally correlates with better design "
+                "outcomes. Targets with extensive disorder may be challenging."
+            ),
+        }
+    except Exception as e:
+        result["target_quality"] = {"error": str(e)}
+
+    result["design_backends"] = [
+        {
+            "name": "Protenix-v2",
+            "license": "Apache-2.0",
+            "strengths": (
+                "Best-in-class for de novo antibody design. 100% target-level "
+                "success rate in novelty-controlled VHH-Fc campaigns. Hit rates "
+                "up to 48%. Best for VHH and VHH-Fc formats."
+            ),
+            "reference": "bioRxiv 2026.04.10.717613",
+            "recommended_for": ["VHH", "VHH-Fc"],
+        },
+        {
+            "name": "Boltz-2",
+            "license": "MIT",
+            "strengths": (
+                "Good for structure prediction and affinity prediction via "
+                "predict_affinity=True. Fast (~20s/GPU). Commercial-safe."
+            ),
+            "recommended_for": ["validation", "affinity_prediction"],
+        },
+        {
+            "name": "Chai-1",
+            "license": "Apache-2.0",
+            "strengths": (
+                "Multi-modal, good for complex antibody formats and "
+                "multi-chain co-folding. Commercial-safe."
+            ),
+            "recommended_for": ["mAb", "complex_formats"],
+        },
+    ]
+
+    result["expected_hit_rates"] = {
+        "VHH-Fc": "16-48% (Protenix-v2 benchmarks)",
+        "VHH": "Similar to VHH-Fc (Protenix-v2 benchmarks)",
+        "mAb": "Up to 50% (format-dependent, fewer benchmarks available)",
+    }
+
+    result["recommended_workflow"] = [
+        "1. Assess target confidence with assess_confidence(target_uniprot_id) — "
+        "higher pLDDT targets generally yield better design outcomes.",
+        "2. Predict target structure with predict_structure if not already in AFDB.",
+        "3. Use Protenix-v2 for de novo binder design — best available hit rates "
+        "for VHH/VHH-Fc formats.",
+        "4. Validate designed binders with predict_structure using multiple backends "
+        "(Boltz-2, Chai-1) to check structural plausibility.",
+        "5. Compare predictions with compare_predictions to assess CDR confidence "
+        "and identify uncertain loop conformations.",
+        "6. Cross-reference with SAbDab (Structural Antibody Database) for similar "
+        "known binders to inform design choices.",
+    ]
+
+    result["caveats"] = [
+        "Hit rates are from controlled benchmarks and may vary on novel targets.",
+        "Protenix-v2 benchmarks used novelty-controlled campaigns — real-world "
+        "performance depends on target tractability.",
+        "CDR-H3 loop conformations remain challenging for all prediction methods. "
+        "Experimental validation is essential for lead candidates.",
+        "Affinity maturation and developability optimization are beyond the scope "
+        "of structure-based design — integrate with sequence-based methods.",
+        "All hit rates assume proper experimental validation (SPR, BLI, or ELISA).",
+    ]
+
+    return result
+
+
 async def kinase_analysis(uniprot_id: str) -> dict:
     """Kinase Pack — kinase-specific structural analysis.
 

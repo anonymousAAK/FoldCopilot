@@ -310,25 +310,34 @@ async def predict_structure(
 def check_backend_status(
     backend: Annotated[str, "Backend to check: 'boltz2', 'openfold3', 'chai1', 'protenix', 'alphafold3', 'aqaffinity'"] = "boltz2",
 ) -> dict:
-    """Check if a prediction backend is installed and ready.
+    """Check if a prediction backend is installed and GPU-ready.
 
-    Returns installation status, GPU availability, and setup instructions
-    if the backend is not yet configured.
+    Probes the local environment for the specified backend and returns a
+    detailed status report including: installation status, GPU availability
+    (CUDA/ROCm), installed version, and step-by-step setup instructions if
+    the backend is not yet configured.
 
-    Example: check_backend_status("boltz2")
+    Use this before predict_structure to verify that the desired backend
+    is operational on the current machine.
+
+    Example: check_backend_status("boltz2") -> {"installed": true, "gpu_available": true, ...}
     """
     return predict.get_backend_status(backend)
 
 
 @mcp.tool()
 def list_prediction_backends() -> dict:
-    """List all supported prediction backends with license and status info.
+    """List all supported prediction backends with license and installation status.
 
-    Shows which backends are implemented, their license type (commercial_ok
-    vs non_commercial), and whether they're installed locally.
+    Returns a dictionary keyed by backend name, each containing: license type
+    (MIT, Apache-2.0, CC-BY-NC-SA 4.0), commercial_ok flag, installation
+    status on the current machine, and a brief capability summary.
 
-    License routing: when commercial_use=True, only MIT/Apache-2.0 backends
-    are available. AF3 weights are non-commercial — use Boltz-2 or OpenFold3.
+    License routing: when commercial_use=True in predict_structure, only
+    MIT/Apache-2.0 backends (boltz2, openfold3, chai1, protenix) are available.
+    AF3 weights are non-commercial — use Boltz-2 or OpenFold3 for commercial work.
+
+    Example: list_prediction_backends() -> {"boltz2": {"license": "MIT", "commercial_ok": true, ...}, ...}
     """
     return predict.list_backends()
 
@@ -528,6 +537,26 @@ async def analyze_gpcr(
     return await verticals.gpcr_analysis(uniprot_id)
 
 
+@mcp.tool()
+async def design_antibody(
+    target_uniprot_id: Annotated[str, "UniProt ID of the target antigen"],
+    format: Annotated[str, "Antibody format: 'VHH', 'VHH-Fc', or 'mAb'"] = "VHH",
+) -> dict:
+    """Antibody Design Pack — guidance for de novo antibody design campaigns.
+
+    Provides backend recommendations and expected hit rates for de novo
+    antibody design based on Protenix-v2 benchmarks.
+    Supports VHH (nanobody), VHH-Fc, and mAb formats.
+
+    Example: design_antibody("P01308", format="VHH-Fc")
+    """
+    try:
+        target_uniprot_id = validate_uniprot_id(target_uniprot_id)
+    except ValidationError as e:
+        return {"error": str(e)}
+    return await verticals.antibody_design_guidance(target_uniprot_id, format)
+
+
 # --- Education Mode (v0.8) ---
 
 
@@ -611,10 +640,17 @@ def explain_report(
 
 @mcp.tool()
 def list_benchmarks() -> dict:
-    """List available benchmark datasets for prediction evaluation.
+    """List available benchmark datasets for evaluating structure prediction accuracy.
 
-    Returns built-in datasets (DisProt hallucination set, CASP16 monomers)
-    and the option to use custom user-provided PDB pairs.
+    Returns a catalog of built-in benchmark datasets (DisProt hallucination set,
+    CASP16 monomers) as well as instructions for supplying custom user-provided
+    PDB pairs. Each dataset entry includes the number of targets, description,
+    and expected use case (e.g., hallucination detection vs global accuracy).
+
+    Use this to discover which benchmarks are available before calling
+    benchmark_prediction or benchmark_batch.
+
+    Example: list_benchmarks() -> {"datasets": [{"name": "casp16_monomers", ...}, ...]}
     """
     return benchmarks.list_benchmark_datasets()
 
@@ -766,7 +802,12 @@ def check_fold_drift(
 def check_prediction_drift(
     manifest_path: Annotated[str, "Path to a reproducibility_manifest.json file"],
 ) -> dict:
-    """Check a single prediction's manifest for version drift.
+    """Check a single prediction's reproducibility manifest for backend version drift.
+
+    Reads the specified manifest JSON and compares the backend version, weights
+    hash, and runtime environment recorded at prediction time against the
+    currently installed versions. Returns a drift report indicating whether
+    re-running the prediction would likely produce different results.
 
     Example: check_prediction_drift("~/.cache/foldcopilot/predictions/boltz_abc123/output/reproducibility_manifest.json")
     """
@@ -778,34 +819,56 @@ def check_prediction_drift(
 
 @mcp.tool()
 def health() -> dict:
-    """Health check — server status, backend availability, version info.
+    """Health check — comprehensive server status, backend availability, and diagnostics.
 
-    Returns server version, registered tool count, backend installation
-    status, and cache directory info.
+    Returns a detailed status object including: server version, total number of
+    registered MCP tools, per-backend installation and GPU availability summary,
+    supported transport protocols, cache directory info, and a UTC timestamp.
+
+    Use this to verify that the FoldCopilot server is running correctly and to
+    quickly assess which prediction backends are operational.
+
+    Example: health() -> {"status": "healthy", "version": "0.1.0", "tools_count": 33, ...}
     """
     import foldcopilot
+    from datetime import datetime, timezone
 
     backend_status = {}
+    backends_installed = 0
     for backend_name in ["boltz2", "openfold3", "chai1", "protenix", "alphafold3", "aqaffinity"]:
         try:
             status = predict.get_backend_status(backend_name)
+            installed = status.get("installed", False)
             backend_status[backend_name] = {
-                "installed": status.get("installed", False),
+                "installed": installed,
                 "gpu_available": status.get("gpu_available", False),
             }
+            if installed:
+                backends_installed += 1
         except Exception:
             backend_status[backend_name] = {"installed": False, "gpu_available": False}
 
     from pathlib import Path
     cache_dir = Path.home() / ".cache" / "foldcopilot"
 
+    # Count registered tools via the FastMCP registry
+    try:
+        tools_count = len(mcp._tool_manager._tools)
+    except Exception:
+        tools_count = 33  # fallback to known count
+
     return {
         "status": "healthy",
         "version": foldcopilot.__version__,
         "server": "FoldCopilot",
+        "tools_count": tools_count,
+        "transport": ["stdio", "streamable-http"],
         "backends": backend_status,
+        "backends_installed": backends_installed,
+        "backends_total": 6,
         "cache_dir": str(cache_dir),
         "cache_exists": cache_dir.exists(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

@@ -75,6 +75,50 @@ def _find_low_confidence_spans(
     return spans
 
 
+def _extract_af2_disorder_regions(
+    scores: list[float], threshold: float = 50.0
+) -> list[dict]:
+    """Extract contiguous spans where AF2 pLDDT < threshold as disorder predictions.
+
+    AF2 avoids structural hallucinations in disordered regions — unlike AF3,
+    which creates them (PubMed 41454828). Regions where AF2 reports pLDDT < 50
+    are therefore a reliable complementary disorder signal.
+
+    Returns list of dicts with 1-indexed, inclusive start/end positions.
+    """
+    regions: list[dict] = []
+    in_span = False
+    start = 0
+
+    for i, s in enumerate(scores):
+        if s < threshold:
+            if not in_span:
+                start = i
+                in_span = True
+        else:
+            if in_span:
+                span_scores = scores[start:i]
+                regions.append({
+                    "start": start + 1,   # 1-indexed
+                    "end": i,             # 1-indexed, inclusive
+                    "mean_plddt": round(float(np.mean(span_scores)), 1),
+                    "length": i - start,
+                })
+                in_span = False
+
+    # Handle span at end of sequence
+    if in_span:
+        span_scores = scores[start:]
+        regions.append({
+            "start": start + 1,
+            "end": len(scores),
+            "mean_plddt": round(float(np.mean(span_scores)), 1),
+            "length": len(scores) - start,
+        })
+
+    return regions
+
+
 def _check_hallucinations(
     scores: list[float],
     idr_regions: list[dict],
@@ -190,12 +234,70 @@ async def assess_confidence(uniprot_id: str) -> dict:
         _check_hallucinations(scores, mobidb_regions, "mobidb")
     )
 
-    # IDR strategy note: AF2 vs AF3 for disordered regions
-    idr_strategy_note = (
+    # AF2-based disorder detection (dual-model IDR strategy)
+    af2_disorder_regions = _extract_af2_disorder_regions(scores)
+
+    # Build dynamic IDR strategy note based on findings
+    idr_note_parts = [
         "For IDR identification, AF2 is preferred over AF3 — AF2 avoids structural "
-        "hallucinations in disordered regions while AF3 creates them (PubMed 41454828). "
-        "Consider cross-referencing AF2 pLDDT < 50 as a complementary disorder signal."
-    )
+        "hallucinations in disordered regions while AF3 creates them (PubMed 41454828).",
+    ]
+
+    if af2_disorder_regions:
+        total_residues = sum(r["length"] for r in af2_disorder_regions)
+        idr_note_parts.append(
+            f"AF2 pLDDT < 50 identifies {len(af2_disorder_regions)} disorder "
+            f"span(s) covering {total_residues} residues."
+        )
+
+        # Cross-reference with DisProt/MobiDB IDR flags
+        db_idr_ranges = set()
+        for flag in idr_flags:
+            db_idr_ranges.update(range(flag.start, flag.end + 1))
+
+        if db_idr_ranges:
+            agreements = 0
+            af2_only = 0
+            for region in af2_disorder_regions:
+                af2_range = set(range(region["start"], region["end"] + 1))
+                if af2_range & db_idr_ranges:
+                    agreements += 1
+                else:
+                    af2_only += 1
+
+            if agreements:
+                idr_note_parts.append(
+                    f"{agreements} AF2 disorder span(s) overlap with DisProt/MobiDB "
+                    f"annotations (concordant — high-confidence disorder)."
+                )
+            if af2_only:
+                idr_note_parts.append(
+                    f"{af2_only} AF2 disorder span(s) lack DisProt/MobiDB annotations "
+                    f"(novel AF2-only disorder candidates)."
+                )
+
+            # Check for database IDRs NOT detected by AF2
+            af2_residues = set()
+            for region in af2_disorder_regions:
+                af2_residues.update(range(region["start"], region["end"] + 1))
+            db_only_residues = db_idr_ranges - af2_residues
+            if db_only_residues:
+                idr_note_parts.append(
+                    f"{len(db_only_residues)} database-annotated IDR residue(s) have "
+                    f"AF2 pLDDT >= 50 — potential hallucination risk if using AF3."
+                )
+        else:
+            idr_note_parts.append(
+                "No DisProt/MobiDB annotations available for cross-reference; "
+                "AF2 disorder spans are the sole disorder signal."
+            )
+    else:
+        idr_note_parts.append(
+            "No AF2 pLDDT < 50 spans detected — AF2 predicts confident structure "
+            "throughout the sequence."
+        )
+
+    idr_strategy_note = " ".join(idr_note_parts)
 
     # Benchmarking context
     confidence_interpretation_note = (
@@ -214,6 +316,7 @@ async def assess_confidence(uniprot_id: str) -> dict:
         pae_summary=pae_summary,
         idr_flags=idr_flags,
         hallucination_warnings=hallucination_warnings,
+        af2_disorder_regions=af2_disorder_regions if af2_disorder_regions else None,
         idr_strategy_note=idr_strategy_note,
         confidence_interpretation_note=confidence_interpretation_note,
     )

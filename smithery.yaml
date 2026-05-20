@@ -1,0 +1,18 @@
+# Smithery configuration for FoldCopilot
+# https://smithery.ai
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+  commandFunction:
+    command: python
+    args:
+      - "-m"
+      - "foldcopilot.server"
+    env: {}
+
+build:
+  dockerfile: null
+  dockerBuildPath: null

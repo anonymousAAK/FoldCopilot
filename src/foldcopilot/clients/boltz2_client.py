@@ -221,6 +221,7 @@ async def predict_local(
                 "use_msa": prediction_input.use_msa,
                 "predict_affinity": prediction_input.predict_affinity,
             },
+            training_data_source="Boltz-2 training data (Passaro et al., bioRxiv 2025.06.14.659707)",
         )
 
         # Save manifest

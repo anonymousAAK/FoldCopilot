@@ -64,6 +64,7 @@ class ReproducibilityManifest(BaseModel):
     backend: str
     backend_version: str | None = None
     weights_hash: str | None = None
+    training_data_source: str | None = None
     input_sequence_hash: str
     parameters: dict[str, Any]
     seed: int | None = None
@@ -80,6 +81,7 @@ class ReproducibilityManifest(BaseModel):
         parameters: dict[str, Any],
         backend_version: str | None = None,
         weights_hash: str | None = None,
+        training_data_source: str | None = None,
         seed: int | None = None,
         gpu_type: str | None = None,
     ) -> ReproducibilityManifest:
@@ -91,6 +93,7 @@ class ReproducibilityManifest(BaseModel):
             backend=backend,
             backend_version=backend_version,
             weights_hash=weights_hash,
+            training_data_source=training_data_source,
             input_sequence_hash=seq_hash,
             parameters=parameters,
             seed=seed,

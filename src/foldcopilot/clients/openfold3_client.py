@@ -171,6 +171,7 @@ async def predict_local(
                 "af3_mode": af3_mode,
                 "aqaffinity_mode": aqaffinity_mode,
             },
+            training_data_source="OpenFold3 training data (AWS Open Data Registry, March 2026 release)",
         )
 
         manifest_path = output_dir / "reproducibility_manifest.json"

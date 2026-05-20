@@ -160,6 +160,7 @@ async def predict_local(
                 "use_msa": prediction_input.use_msa,
                 "diffusion_samples": prediction_input.diffusion_samples,
             },
+            training_data_source="Protenix training data (same cutoff as AF3, ByteDance Feb/Apr 2026)",
         )
 
         manifest_path = output_dir / "reproducibility_manifest.json"
