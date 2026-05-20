@@ -82,6 +82,9 @@ class ConfidenceReport(BaseModel):
 
     caveats: list[str] = Field(default_factory=list)
 
+    idr_strategy_note: str | None = None
+    confidence_interpretation_note: str | None = None
+
     def add_standard_caveats(self) -> None:
         self.caveats.extend([
             "pLDDT > 70 does not guarantee correctness; it indicates the model's "

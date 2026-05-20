@@ -13,6 +13,9 @@
 - **ChatMol/molecule-mcp** (~85 stars, Mar 2025): PyMOL + ChimeraX + GROMACS Copilot command execution. Visualization-only; no prediction.
 - **BioinfoMCP** (arXiv 2510.02139, Oct 2025): auto-converter + 38 tools, all classical NGS/sequence pipelines (FastQC, BWA, samtools, GATK, MACS3, etc.). The widely-quoted "94.7% successfully executed complex workflows" is on RNA-seq/ChIP-seq/ATAC-seq/WGS — **no structure predictor is in the 38**, so the metric does not transfer.
 - **No Foldseek MCP wrapper exists.** No DisProt/MobiDB MCP. No tool combines AFDB lookup + Foldseek search + prediction in one agent loop.
+- **FoldRun MCP** (JZ3736, Glama-listed, May 2026): mock MCP server for Gemini Enterprise exposing submit/status/results for Boltz-2, OpenFold3, AF2. Deployed on Cloud Run with StreamableHTTP + SSE. Multi-agent orchestration layer. **Currently demo/mock — no real prediction, no interpretation, no confidence.** But signals Google ecosystem paying attention to this space.
+- **BioMCP** (GenomOncology, MIT, updated Apr 2026): 12 entities, 15+ data sources (ClinicalTrials.gov, PubMed, MyVariant.info). OncoMCP commercial extension for precision oncology. **No structure prediction, no confidence interpretation.** Clinical genomics niche.
+- **IsoDDE** (Isomorphic Labs, Feb 2026): proprietary "AlphaFold 4" — unified structure + affinity + pocket discovery. 2× AF3 accuracy on ligand generalization. Fully closed; technical report offers no reproducibility. **Sets the commercial ceiling but is inaccessible.**
 - **Closest non-MCP analogue: OmniFold** (PMC12330748), a containerized wrapper around AF3 + Chai-1 + Boltz-2; not agentic, no Protenix, no MCP, no interpretation layer.
 - **Commercial SaaS** (Tamarind Bio, Neurosnap, 310.ai, Latch Bio, Rowan, Recursion-hosted Boltz): closed, not MCP-native, paid. They own the enterprise path. The developer/agentic path is open.
 
@@ -26,7 +29,7 @@
 | **Boltz-2** | Released Jun 2025 (Passaro et al., bioRxiv 2025.06.14.659707); 20 s/GPU, predicts affinity with a Pearson correlation of 0.66 on the 4-target FEP+ subset ("Boltz-2 achieves an average Pearson correlation of 0.66, outperforming all available inexpensive physical methods and ML baselines") | **MIT** | **Default MVP backend.** |
 | **Chai-1** | Open Sep 2024 | **Apache-2.0** (commercial OK) | Add at v0.4. |
 | **Chai-2** | Jun 2025; closed, partner-only via Responsible Deployment policy; 16% antibody hit rate across 52 targets | Closed | **Drop entirely** — wrapping a closed API violates ToS. |
-| **Protenix** | ByteDance | Apache-2.0 | Defer; lower marginal value. |
+| **Protenix v1/v2** | v1 Feb 2026, v2 Apr 2026 (ByteDance); v2 has 464M params, beats AF3 on Ab-Ag by 9-13 pts, VHH-Fc hit rates up to 48% | **Apache-2.0** | ~~Defer~~ → **Promote to v1.0 backend.** Best open Ab-Ag predictor. |
 | **OpenFold3 (preview)** | Released Oct 28 2025 (AlQuraishi Lab + LLNL + Steinegger Lab); bitwise reproduction of AF3 | **Apache-2.0** | **Add as MVP backend** — commercial-safe AF3 substitute. |
 | **AQAffinity** | Jan 2026 (SandboxAQ on top of OpenFold3); structure-free affinity prediction | Open | Add as affinity option. |
 | **ESM3 / ESM C** | ESM3-open small (1.4B) non-commercial; ESM C 300M/600M open-weight | Mixed | Embedding pre-screening only. |
@@ -134,6 +137,88 @@ The plan (v0.1 AFDB read → v0.2 Foldseek+search → v0.3 prediction backends �
 4. **Distribution**: JOSS + bioRxiv + Zenodo dataset > Show HN. Coordinated 48-hour launch across all MCP directories.
 5. **Benchmarks that change recommendations**: if a polished competitor reaches 500+ stars in the next 60 days, pivot from generalist to a therapeutic vertical (antibodies or kinases) where domain depth matters more. If Anthropic ships a first-party AlphaFold Skill, double down on the DisProt/MobiDB/AlphaMissense integration layer — that is where you outflank them.
 
+## v1.0 Extension Plan (May 2026 Research Update)
+
+### New landscape developments since original plan
+
+#### Models & Backends
+
+| Model | Status May 2026 | License | Implication |
+|---|---|---|---|
+| **Protenix-v1** | Released Feb 2026 (ByteDance); first open-source model to surpass AF3 on same training data cutoff | **Apache-2.0** | Was "deferred" — now promote to supported backend. |
+| **Protenix-v2** | Released Apr 2026; 464M params; antibody-antigen success rates 49.7–65% (9–13 pt gains over v1); VHH-Fc hit rates up to 48% | **Apache-2.0** | **Best open Ab-Ag predictor.** Critical for antibody vertical pack. |
+| **IsoDDE** | Isomorphic Labs, Feb 2026; 2× AF3 accuracy on ligand generalization benchmark; unified structure + affinity + pocket discovery | **Proprietary (closed)** | Sets the commercial ceiling. Cannot integrate. Add to competitive context. |
+| **OpenFold3 (Mar 2026 update)** | Major update: training data released via AWS Open Data; updated benchmarks; antibody-antigen improvement prioritized for 2026 | **Apache-2.0** | Update client version tracking; leverage new training data release notes. |
+| **Boltz-2 PPI affinity** | Fine-tuning paper (arXiv 2512.06592): Boltz-2 underperforms sequence-based methods for protein-protein affinity despite high structural accuracy | MIT | Document limitation in recommendations; suggest hybrid approach (Boltz-2 structure + sequence-based affinity). |
+
+#### Competitors
+
+| Competitor | Status May 2026 | Threat Level |
+|---|---|---|
+| **FoldRun MCP** (JZ3736/Glama) | Mock MCP server for Gemini Enterprise. Exposes submit/status/results for Boltz-2, OpenFold3, AF2. Deployed on Cloud Run. Multi-agent orchestration. | **Medium** — signals Google ecosystem attention; currently mock/demo only, but pattern could be productionized. |
+| **BioMCP** (GenomOncology) | Active as of Apr 2026. OncoMCP commercial extension for precision oncology (HIPAA, 15k+ trials). 12 entities, 15+ data sources. | **Low** — clinical/genomic focus, no structure prediction or confidence interpretation. |
+| **IsoDDE** (Isomorphic Labs) | Proprietary "AlphaFold 4". Scientists cannot see inside. | **None** (closed) — but sets expectations for what AI drug discovery engines can do. |
+| **ProteinMCP** | Peer-reviewed (Protein Science 35(4):e70547). Still AF2-era, no AF3/Boltz-2/confidence layer. | **Low** — different niche (protein engineering workflows). |
+
+#### Protocol & Infrastructure
+
+- **HTTP+SSE deprecated June 30, 2026.** Hard deadline. Streamable HTTP only going forward. Next MCP spec release (tentatively June 2026) adds stateless operation and scalable session handling.
+- **FastMCP 3.0.2** (Feb 2026): `ctx.is_background_task`, `ctx.task_id` for branching on execution mode; Redis-based elicitation in background tasks; authorization-scoped tasks survive session churn.
+- **Smithery: 7,000+ servers.** Quality score directly determines search ranking. Target 100/100.
+- **AgentSeal security scan**: 66% of 1,808 MCP servers had security findings (worse than BlueRock's 36.7%). Reinforces input validation priority.
+
+#### Science
+
+- **CASP16 results published** (PMC, May 2026): Monomer prediction "largely solved" — no target folds incorrectly predicted. Multimer: <25% high quality. AF3 key for confidence estimation and model selection. Challenges remain in irregular secondary structures, truncated sequences, interaction-induced conformational changes.
+- **AF2 preferred over AF3 for IDR detection** (PubMed 41454828): AF2 avoids structural hallucinations in disordered regions; AF3 creates them. Suggests dual-model IDR strategy: AF2 for disorder annotation, AF3/Boltz-2 for structure.
+- **Boltz-2 human interactome** (PMC 12236519): Large-scale PPI structure prediction demonstrates Boltz-2's scalability but exposes affinity prediction limitations.
+
+### Prioritized v1.0 extension items
+
+#### P0 — Do now
+
+1. **Add Protenix-v2 as 6th backend.** Apache-2.0, best open Ab-Ag predictor, directly enhances antibody vertical pack. Client pattern identical to OpenFold3. Wire `protenix` / `protenix2` CLI.
+2. **Ensure Streamable HTTP only.** Audit server transport config. Remove any SSE fallback before June 30 deadline.
+3. **Update competitive landscape** in README with FoldRun MCP, IsoDDE, BioMCP Apr 2026, Protenix-v2 benchmarks.
+
+#### P1 — Before v1.0 release
+
+4. **FastMCP 3.0.2 features.** Use `ctx.is_background_task` and `ctx.task_id` in predict_structure for better progress reporting. Leverage authorization-scoped task persistence.
+5. **CASP16 benchmark integration.** Update benchmarking harness with published CASP16 assessment criteria and evaluation metrics. Add CASP16 monomer + multimer datasets to registry.
+6. **Dual-model IDR strategy.** Add optional AF2-based disorder detection alongside AF3 hallucination flagging. AF2 pLDDT < 50 as disorder signal (no hallucination risk) combined with AF3/Boltz-2 structure prediction.
+7. **Boltz-2 PPI affinity caveat.** Update kinase pack and predict tool recommendations to note Boltz-2 affinity limitations for PPI (fine-tuning paper). Suggest hybrid: Boltz-2 structure + sequence-based affinity scoring.
+
+#### P2 — Post-launch
+
+8. **Protenix-v2 antibody design integration.** VHH-Fc campaign support in antibody vertical pack, leveraging Protenix-v2's 48% hit rate capability.
+9. **OpenFold3 training data provenance.** Surface AWS Open Data training set metadata in reproducibility manifests.
+10. **Smithery 100/100 quality score.** Ensure all Smithery quality dimensions are maximized: install reliability, documentation, test coverage, tool descriptions, error handling.
+
+### Updated backend roadmap (6 backends)
+
+```
+v0.3  Boltz-2         (MIT)         — default, fast, affinity
+v0.5  OpenFold3       (Apache-2.0)  — AF3 reproduction, commercial-safe
+v0.5  Chai-1          (Apache-2.0)  — multi-modal biomolecular
+v0.5  AF3 BYO-weights (CC-BY-NC-SA) — gated, non-commercial attestation
+v1.0  Protenix-v2     (Apache-2.0)  — best open Ab-Ag, design capabilities
+v1.0  AQAffinity      (Apache-2.0)  — structure-free affinity on OpenFold3
+```
+
+### Updated competitive positioning
+
+```
+FoldCopilot (v1.0)     — 6 backends, confidence interpretation, IDR flagging,
+                         therapeutic verticals, ensemble disagreement, benchmarking
+ProteinMCP             — AF2-era protein engineering, no confidence/prediction
+AlphaFold-MCP-Server   — AFDB lookup only, stale (Jul 2025)
+FoldRun MCP            — Gemini demo, mock tools, no interpretation
+BioMCP/OncoMCP         — Clinical genomics, no structure prediction
+ChatMol/molecule-mcp   — Visualization only
+BioinfoMCP             — NGS pipelines only
+IsoDDE                 — Proprietary, closed, inaccessible
+```
+
 ## Caveats
 - The "94.7% success rate" of BioinfoMCP refers to classical NGS pipelines, not structure prediction; do not over-extrapolate.
 - Chai-2's antibody hit rates (16–50% depending on metric) and Boltz-2's 0.66 FEP+ correlation are developer-reported; real-world benchmarks (deepmirror.ai on DHX9 and cGAS, Bugrova et al. on SMILES vs CCD sensitivity) show mixed results — frame all reported metrics as upper-bound estimates in user-facing copy.
@@ -141,3 +226,9 @@ The plan (v0.1 AFDB read → v0.2 Foldseek+search → v0.3 prediction backends �
 - Anthropic Fellows / CZI EOSS / Schmidt Sciences program details are accurate as of May 2026 but cycle dates change — verify before applying.
 - ProteinMCP's "4 stars" snapshot is May 2026 and may change. The competitive landscape will look materially different in 6 months if a frontier lab ships a first-party fold copilot.
 - The 22% AF3-IDR-hallucination rate is from a single arXiv preprint (2510.15939) on 72 DisProt proteins; the EBI's own "What AlphaFold 3 struggles with" page confirms the qualitative phenomenon but the quantitative figure may not generalize beyond the curated set.
+- **FoldRun MCP is currently mock/demo only** — it exposes fake tools with no real prediction backend. But the pattern (Cloud Run + StreamableHTTP + multi-agent orchestration) is productionizable. Monitor for real implementation.
+- **Protenix-v2 benchmarks are developer-reported** (bioRxiv 2026.04.10.717613). Independent CASP-style evaluation pending. The 48% VHH-Fc hit rate is on their internal target set.
+- **IsoDDE technical report** (Zenodo 10.5281/zenodo.18606681) offers scant reproducibility detail — described as "the technical paper offers scant insight into how to achieve similar results" (Nature d41586-026-00365-7). Not a competitive threat to open-source tools.
+- **CASP16 monomer assessment** (PMC 12157625) confirms single-domain fold prediction is "largely solved" — the frontier has moved to multimers, conformational dynamics, and affinity. FoldCopilot's ensemble disagreement + vertical packs are well-positioned for this shift.
+- **HTTP+SSE deprecation is a hard deadline** (June 30, 2026). Any MCP server still using SSE transport after this date will be non-compliant with the spec. Audit before release.
+- **AgentSeal's 66% security findings rate** (1,808 servers scanned) is worse than BlueRock's earlier 36.7% SSRF figure. The security bar for MCP servers remains low — meeting it is a differentiator.

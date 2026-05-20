@@ -15,6 +15,7 @@ class PredictionBackend(str, Enum):
     BOLTZ2 = "boltz2"
     OPENFOLD3 = "openfold3"
     CHAI1 = "chai1"
+    PROTENIX = "protenix"
     AF3 = "alphafold3"       # BYO-weights only, non-commercial
     AQAFFINITY = "aqaffinity"  # SandboxAQ, on top of OpenFold3
 
@@ -29,6 +30,7 @@ BACKEND_LICENSES: dict[PredictionBackend, LicenseType] = {
     PredictionBackend.BOLTZ2: LicenseType.COMMERCIAL_OK,       # MIT
     PredictionBackend.OPENFOLD3: LicenseType.COMMERCIAL_OK,    # Apache-2.0
     PredictionBackend.CHAI1: LicenseType.COMMERCIAL_OK,        # Apache-2.0
+    PredictionBackend.PROTENIX: LicenseType.COMMERCIAL_OK,     # Apache-2.0
     PredictionBackend.AF3: LicenseType.NON_COMMERCIAL,         # CC-BY-NC-SA 4.0 + non-commercial weights
     PredictionBackend.AQAFFINITY: LicenseType.COMMERCIAL_OK,   # Open
 }

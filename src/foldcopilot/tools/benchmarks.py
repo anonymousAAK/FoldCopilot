@@ -35,8 +35,27 @@ BENCHMARK_DATASETS = {
     },
     "casp16_monomers": {
         "name": "CASP16 Monomer Targets",
-        "description": "Free modeling targets from CASP16 with experimental structures.",
+        "description": (
+            "Free modeling targets from CASP16 with experimental structures. "
+            "CASP16 monomer assessment published (PMC 12157625, 2026). "
+            "Single-domain fold prediction largely solved — no target folds "
+            "incorrectly predicted. AF3 key for confidence estimation."
+        ),
         "source": "predictioncenter.org",
+        "reference": "PMC 12157625",
+        "size": None,  # varies
+        "type": "structure_accuracy",
+    },
+    "casp16_multimers": {
+        "name": "CASP16 Multimer Targets",
+        "description": (
+            "Multimer/complex targets from CASP16 with experimental structures. "
+            "CASP16 monomer assessment published (PMC 12157625, 2026). "
+            "Multimer prediction remains challenging: <25% high quality. "
+            "AF3 key for confidence estimation."
+        ),
+        "source": "predictioncenter.org",
+        "reference": "PMC 12157625",
         "size": None,  # varies
         "type": "structure_accuracy",
     },

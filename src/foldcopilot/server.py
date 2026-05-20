@@ -251,7 +251,7 @@ async def find_confident_homologs(
 @mcp.tool(task=_TASKS_AVAILABLE or None)
 async def predict_structure(
     sequences: Annotated[list[str], "Amino acid sequences to fold (one per chain)"],
-    backend: Annotated[str, "Prediction backend: 'boltz2' (MIT), 'openfold3' (Apache-2.0), 'chai1' (Apache-2.0), 'alphafold3' (BYO-weights, non-commercial), 'aqaffinity' (SandboxAQ)"] = "boltz2",
+    backend: Annotated[str, "Prediction backend: 'boltz2' (MIT), 'openfold3' (Apache-2.0), 'chai1' (Apache-2.0), 'protenix' (Apache-2.0), 'alphafold3' (BYO-weights, non-commercial), 'aqaffinity' (SandboxAQ)"] = "boltz2",
     commercial_use: Annotated[bool, "Set True if results will be used commercially. Enforces license routing."] = False,
     af3_noncommercial_attestation: Annotated[bool, "Required for AF3: attest that use is non-commercial and weights are self-supplied."] = False,
     recycling_steps: Annotated[int, "Number of recycling steps (Boltz-2)"] = 3,
@@ -270,6 +270,7 @@ async def predict_structure(
     - boltz2 (MIT): ~20s/GPU, affinity prediction, fast default
     - openfold3 (Apache-2.0): AF3 reproduction, commercial-safe
     - chai1 (Apache-2.0): multi-chain, ligand support
+    - protenix (Apache-2.0): ByteDance AF3 reproduction, commercial-safe
     - alphafold3 (CC-BY-NC-SA 4.0): BYO-weights only, non-commercial
     - aqaffinity (Open): SandboxAQ affinity on top of OpenFold3
 
@@ -282,6 +283,9 @@ async def predict_structure(
     Example: predict_structure(["MKFLILLFNILCLFPVLAADNHGVS..."])
     """
     if ctx:
+        # FastMCP 3.0.2: include task_id in progress if running as background task
+        if hasattr(ctx, 'task_id') and ctx.task_id:
+            await ctx.report_progress(0, 100, f"Task {ctx.task_id}: starting prediction")
         await ctx.report_progress(0, 4, message="Validating input and routing backend")
     result = await predict.predict_structure(
         sequences=sequences,
@@ -296,13 +300,15 @@ async def predict_structure(
         ctx=ctx,
     )
     if ctx:
+        if hasattr(ctx, 'task_id') and ctx.task_id:
+            await ctx.report_progress(100, 100, f"Task {ctx.task_id}: prediction complete")
         await ctx.report_progress(4, 4, message="Prediction complete")
     return result
 
 
 @mcp.tool()
 def check_backend_status(
-    backend: Annotated[str, "Backend to check: 'boltz2', 'openfold3', 'chai1', 'alphafold3', 'aqaffinity'"] = "boltz2",
+    backend: Annotated[str, "Backend to check: 'boltz2', 'openfold3', 'chai1', 'protenix', 'alphafold3', 'aqaffinity'"] = "boltz2",
 ) -> dict:
     """Check if a prediction backend is installed and ready.
 
@@ -780,7 +786,7 @@ def health() -> dict:
     import foldcopilot
 
     backend_status = {}
-    for backend_name in ["boltz2", "openfold3", "chai1", "alphafold3", "aqaffinity"]:
+    for backend_name in ["boltz2", "openfold3", "chai1", "protenix", "alphafold3", "aqaffinity"]:
         try:
             status = predict.get_backend_status(backend_name)
             backend_status[backend_name] = {
@@ -809,6 +815,8 @@ def main():
     from foldcopilot.observability import setup_tracing
     setup_tracing()
 
+    # FastMCP 3.0.2 defaults to streamable-http for remote, stdio for local.
+    # HTTP+SSE transport is deprecated and will be removed June 30 2026.
     mcp.run()
 
 

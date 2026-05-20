@@ -190,6 +190,20 @@ async def assess_confidence(uniprot_id: str) -> dict:
         _check_hallucinations(scores, mobidb_regions, "mobidb")
     )
 
+    # IDR strategy note: AF2 vs AF3 for disordered regions
+    idr_strategy_note = (
+        "For IDR identification, AF2 is preferred over AF3 — AF2 avoids structural "
+        "hallucinations in disordered regions while AF3 creates them (PubMed 41454828). "
+        "Consider cross-referencing AF2 pLDDT < 50 as a complementary disorder signal."
+    )
+
+    # Benchmarking context
+    confidence_interpretation_note = (
+        "CASP16 assessment (2026) confirms monomer fold prediction is largely solved. "
+        "Remaining challenges: multimers (<25% high quality), irregular secondary "
+        "structures, and interaction-induced conformational changes."
+    )
+
     report = ConfidenceReport(
         uniprot_id=uniprot_id,
         source="afdb",
@@ -200,6 +214,8 @@ async def assess_confidence(uniprot_id: str) -> dict:
         pae_summary=pae_summary,
         idr_flags=idr_flags,
         hallucination_warnings=hallucination_warnings,
+        idr_strategy_note=idr_strategy_note,
+        confidence_interpretation_note=confidence_interpretation_note,
     )
     report.add_standard_caveats()
 

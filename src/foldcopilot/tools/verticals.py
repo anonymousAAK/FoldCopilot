@@ -74,6 +74,8 @@ async def antibody_analysis(
         "Compare predictions from multiple backends using compare_predictions to identify "
         "uncertain CDR loop conformations.",
         "Cross-reference with SAbDab (Structural Antibody Database) for similar antibody structures.",
+        "Protenix-v2 (Apache-2.0) is the best open antibody-antigen predictor as of May 2026, "
+        "with 49-65% success rates on Ab-Ag benchmarks.",
     ]
 
     return result
@@ -164,6 +166,9 @@ async def kinase_analysis(uniprot_id: str) -> dict:
         "Check DFG-in vs DFG-out conformation — critical for inhibitor type selectivity.",
         "Cross-reference AlphaMissense hotspots with ATP binding site proximity.",
         "Compare prediction confidence at the activation loop — often flexible and uncertain.",
+        "Boltz-2 affinity prediction works well for small-molecule binding but underperforms "
+        "sequence-based methods for protein-protein affinity (arXiv 2512.06592). Consider "
+        "hybrid approaches for PPI.",
     ]
 
     return result
@@ -252,6 +257,7 @@ async def gpcr_analysis(uniprot_id: str) -> dict:
         "ICL3 (intracellular loop 3) is often disordered — low pLDDT is expected.",
         "N/C-termini are frequently disordered in GPCRs. Check DisProt cross-reference.",
         "For ligand binding analysis, combine AlphaFill transplants with Boltz-2 co-folding.",
+        "Protenix-v2 shows improved performance on GPCR targets with VHH-Fc hit rates of 16-88%.",
     ]
 
     return result

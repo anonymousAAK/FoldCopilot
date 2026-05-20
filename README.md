@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/MCP-Native-5A67D8?style=for-the-badge" alt="MCP Native" />
   <img src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" alt="MIT License" />
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
-  <img src="https://img.shields.io/badge/Backends-Boltz--2_|_OpenFold3_|_Chai--1_|_AF3_|_AQAffinity-F59E0B?style=for-the-badge" alt="Backends" />
+  <img src="https://img.shields.io/badge/Backends-Boltz--2_|_OpenFold3_|_Chai--1_|_AF3_|_AQAffinity_|_Protenix--v2-F59E0B?style=for-the-badge" alt="Backends" />
 </p>
 
 <h1 align="center">FoldCopilot</h1>
@@ -29,7 +29,7 @@ AlphaFold changed biology. But it also introduced a new failure mode: **confiden
 
 - **22% of intrinsically disordered residues** are falsely predicted as ordered by AlphaFold 3 ([arXiv 2510.15939](https://arxiv.org/abs/2510.15939))
 - **No existing tool** cross-checks predictions against DisProt/MobiDB ground truth
-- **No existing tool** compares outputs across Boltz-2, OpenFold3, and Chai-1 to surface disagreement
+- **No existing tool** compares outputs across Boltz-2, OpenFold3, Chai-1, and Protenix-v2 to surface disagreement
 - **No existing MCP server** wraps Foldseek for structural similarity search
 - Researchers copy-paste pLDDT scores without understanding what they mean
 
@@ -57,8 +57,11 @@ FoldCopilot fixes this. It sits between prediction backends and the researcher, 
 | AlphaFold-MCP-Server | 33 | AFDB REST lookup | Cannot run predictions, no interpretation |
 | ChatMol/molecule-mcp | ~85 | PyMOL/ChimeraX visualization | No prediction, no confidence |
 | BioinfoMCP | 38 tools | Classical NGS pipelines | Zero structure predictors |
-| BioMCP | ~new | PDB active site + disease-protein search (TypeScript) | No prediction, no confidence interpretation, no ensembling |
-| **FoldCopilot** | **New** | **Confidence interpretation + ensemble disagreement + 3 backends + Foldseek** | **This is the gap** |
+| BioMCP | ~new | PDB active site + disease-protein search (TypeScript) | No prediction, no confidence interpretation, no ensembling. See also BioMCP/OncoMCP below. |
+| FoldRun MCP | — | Mock MCP for Gemini Enterprise | No real prediction or interpretation. Demo only. |
+| IsoDDE (Isomorphic Labs) | — | Proprietary "AlphaFold 4". Closed, inaccessible. Sets commercial ceiling. | No open access, no MCP, no interpretation |
+| BioMCP/OncoMCP | ~new | Clinical genomics (ClinicalTrials, PubMed, variants). Active Apr 2026. | No structure prediction, no confidence interpretation |
+| **FoldCopilot** | **New** | **Confidence interpretation + ensemble disagreement + 6 backends + Foldseek** | **This is the gap** |
 
 </details>
 
@@ -135,9 +138,9 @@ FoldCopilot will:
 
 | Tool | Description |
 |---|---|
-| `predict_structure` | Run predictions via Boltz-2 (MIT), OpenFold3 (Apache-2.0), Chai-1 (Apache-2.0), AF3 (BYO-weights), AQAffinity. **Background task** with progress reporting. |
+| `predict_structure` | Run predictions via Boltz-2 (MIT), OpenFold3 (Apache-2.0), Chai-1 (Apache-2.0), AF3 (BYO-weights), AQAffinity, Protenix-v2 (Apache-2.0). **Background task** with progress reporting. |
 | `check_backend_status` | Verify backend installation and GPU availability |
-| `list_prediction_backends` | All 5 backends with license type and installation status |
+| `list_prediction_backends` | All 6 backends with license type and installation status |
 
 ### Ensemble Comparison (Moat 2)
 
@@ -215,12 +218,13 @@ FoldCopilot will:
    +------+---+ +---+----+ +-+--------+ +----+-----+ +---+--------+
           |          |        |               |            |
    +------v---+ +---v----+ +-v--------+ +----v-----+ +---v--------+
-   |AFDB      | |Foldseek| |Boltz-2   | |AlphaMiss.| |Antibody    |
-   |DisProt   | |Web API | |OpenFold3 | |AlphaFill | |Kinase      |
-   |MobiDB    | +--------+ |Chai-1    | +----------+ |GPCR        |
-   +----------+            |AF3 (BYO) |              |TMalphaFold |
-                            |AQAffinity|              +------------+
-                            +----+-----+
+   |AFDB      | |Foldseek| |Boltz-2    | |AlphaMiss.| |Antibody    |
+   |DisProt   | |Web API | |OpenFold3  | |AlphaFill | |Kinase      |
+   |MobiDB    | +--------+ |Chai-1     | +----------+ |GPCR        |
+   +----------+            |AF3 (BYO)  |              |TMalphaFold |
+                            |AQAffinity |              +------------+
+                            |Protenix-v2|
+                            +----+------+
                                  |
                             +----v-------+     +------------+
                             | Ensemble   |     | Education  |
@@ -249,12 +253,13 @@ FoldCopilot will:
 | **Chai-1** | Apache-2.0 | ~minutes | No | Multi-chain + ligands |
 | **AlphaFold 3** | CC-BY-NC-SA 4.0 | ~minutes | No | BYO-weights, non-commercial only |
 | **AQAffinity** | Open | ~minutes | Yes | SandboxAQ, on top of OpenFold3 |
+| **Protenix-v2** | Apache-2.0 | ~30s/GPU | Via design head | Best open Ab-Ag predictor (464M params, ByteDance Apr 2026) |
 
 ### License Routing
 
 ```
-commercial_use=True  --> Boltz-2 (MIT) | OpenFold3 (Apache-2.0) | Chai-1 (Apache-2.0) | AQAffinity (Open)
-commercial_use=False --> All 5 backends available
+commercial_use=True  --> Boltz-2 (MIT) | OpenFold3 (Apache-2.0) | Chai-1 (Apache-2.0) | AQAffinity (Open) | Protenix-v2 (Apache-2.0)
+commercial_use=False --> All 6 backends available
 AF3 weights          --> NEVER auto-selected. BYO-weights + af3_noncommercial_attestation=True required.
 Chai-2               --> NOT supported. Closed API, ToS prohibits relay.
 ```
@@ -325,6 +330,8 @@ FoldCopilot's hallucination detection was developed against the dataset from [ar
 - 72 DisProt proteins with curated disorder annotations
 - 22% of IDR residues hallucinated as ordered by AF3
 - 18% of biological-process residues hallucinated
+
+> **CASP16 note:** CASP16 monomer assessment (2026) confirms single-domain fold prediction is largely solved — the frontier has moved to multimers and affinity.
 
 ### Test Coverage
 
@@ -399,7 +406,7 @@ See also: [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 FoldCopilot is MIT-licensed and welcomes contributions. Areas of high impact:
 
-- **New backends** — Protenix (Apache-2.0), ESMFold (MIT, fast single-sequence)
+- **New backends** — ESMFold (MIT, fast single-sequence), RoseTTAFold-AllAtom
 - **Database integrations** — CATH, SCOP, SAbDab, PDBe-KB
 - **Wet-lab linkage** — Benchling / LabArchives ELN integration
 - **Benchmarks** — CASP16 experimental structures, Polaris-ASAP evaluation sets

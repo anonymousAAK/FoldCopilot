@@ -3,11 +3,12 @@
 v0.3: Boltz-2 (MIT, fast, includes affinity).
 v0.5: + OpenFold3 (Apache-2.0, AF3 reproduction) + Chai-1 (Apache-2.0).
 v0.9: + AF3 (BYO-weights, non-commercial) + AQAffinity (on top of OpenFold3).
+v1.0: + Protenix (Apache-2.0).
 """
 
 from __future__ import annotations
 
-from foldcopilot.clients import boltz2_client, chai1_client, openfold3_client
+from foldcopilot.clients import boltz2_client, chai1_client, openfold3_client, protenix_client
 from foldcopilot.models.prediction import (
     BACKEND_LICENSES,
     LicenseType,
@@ -107,6 +108,8 @@ async def predict_structure(
         result = await openfold3_client.predict_local(prediction_input)
     elif backend_enum == PredictionBackend.CHAI1:
         result = await chai1_client.predict_local(prediction_input)
+    elif backend_enum == PredictionBackend.PROTENIX:
+        result = await protenix_client.predict_local(prediction_input)
     elif backend_enum == PredictionBackend.AF3:
         result = await openfold3_client.predict_local(prediction_input, af3_mode=True)
     elif backend_enum == PredictionBackend.AQAFFINITY:
@@ -146,6 +149,7 @@ def get_backend_status(backend: str = "boltz2") -> dict:
         "boltz2": boltz2_client.get_boltz_status,
         "openfold3": openfold3_client.get_status,
         "chai1": chai1_client.get_status,
+        "protenix": protenix_client.get_status,
         "alphafold3": _get_af3_status,
         "aqaffinity": _get_aqaffinity_status,
     }
@@ -161,6 +165,7 @@ def list_backends() -> dict:
         PredictionBackend.BOLTZ2: boltz2_client.get_boltz_status,
         PredictionBackend.OPENFOLD3: openfold3_client.get_status,
         PredictionBackend.CHAI1: chai1_client.get_status,
+        PredictionBackend.PROTENIX: protenix_client.get_status,
         PredictionBackend.AF3: _get_af3_status,
         PredictionBackend.AQAFFINITY: _get_aqaffinity_status,
     }

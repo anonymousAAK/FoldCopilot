@@ -44,6 +44,10 @@ class TestLicenseRouting:
         err = check_license_compatibility(PredictionBackend.AQAFFINITY, commercial=True)
         assert err is None
 
+    def test_protenix_commercial_ok(self):
+        err = check_license_compatibility(PredictionBackend.PROTENIX, commercial=True)
+        assert err is None
+
     def test_commercial_backends(self):
         commercial_ok = [
             PredictionBackend.BOLTZ2,
@@ -64,6 +68,7 @@ class TestLicenseRouting:
         assert "chai1" in names
         assert "alphafold3" in names
         assert "aqaffinity" in names
+        assert "protenix" in names
         for b in result["backends"]:
             assert b["implemented"] is True
 
@@ -150,6 +155,10 @@ class TestPredictionInput:
         assert inp.sampling_steps == 200
         assert inp.use_msa is True
         assert inp.predict_affinity is False
+
+    def test_protenix_backend(self):
+        inp = PredictionInput(sequences=["MKFL"], backend=PredictionBackend.PROTENIX)
+        assert inp.backend == PredictionBackend.PROTENIX
 
     def test_requires_sequence(self):
         with pytest.raises(Exception):
