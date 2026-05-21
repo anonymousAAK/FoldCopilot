@@ -219,6 +219,93 @@ BioinfoMCP             — NGS pipelines only
 IsoDDE                 — Proprietary, closed, inaccessible
 ```
 
+## v1.1+ Extension Plan (May 21, 2026 Research Update)
+
+### New landscape developments
+
+#### Models & Tools
+
+| Tool/Model | Status May 2026 | License | Implication |
+|---|---|---|---|
+| **ConforMix** | Published Feb 2026 (arXiv 2512.03312, Nature Comms Bio). Twisted SMC + classifier guidance on Boltz-1 for conformational ensemble sampling. | Open | Conformational ensemble mode for predict_structure. Feeds directly into existing disagreement pipeline. |
+| **RFdiffusion3** | Released Dec 2025 (Baker Lab, Nature + Nature Methods). All-atom, DNA/RNA/small-mol, 10x faster than v2. 41/41 enzyme design challenges solved. | Open | Design validation tool — accept RFdiffusion3 output, re-predict with Boltz-2, compare via ensemble tools. |
+| **BindCraft** | Published Nature 2025 (s41586-025-09429-6). 10-100% experimental success, nanomolar binders without HTS. Uses AF2 internally. | Open | Natural input for FoldCopilot's confidence pipeline — validate designed binders' interface quality. |
+| **LigandMPNN** | Nature Methods 2025 (s41592-025-02626-1). 63.3% recovery for small-mol interactions (vs ProteinMPNN 50.5%). 100+ validated designs. | Open | Future "design validation" vertical. Pairs with AlphaFill cofactor tool. |
+| **NVIDIA NIM Boltz-2 v1.7.0** | Updated May 19, 2026. PAE matrix output (v1.5+), B300/GB300 support, Slurm HPC, TensorRT accel. | Commercial | Add NIM REST API as alternative to CLI in boltz2_client. GPU-less cloud inference. |
+| **PSBench** | Feb 2026 (U Missouri). 1.4M annotated protein structure models. Global + local + interface quality scores. | Open | Gold-standard benchmark dataset for v0.9 harness. |
+
+#### Competitors & Ecosystem
+
+| Entity | Status May 2026 | Threat / Opportunity |
+|---|---|---|
+| **MCPmed** | Peer-reviewed (Briefings in Bioinformatics, PMC12927880). 7+ MCP servers (GEO, STRING, UCSC CB, EMBL-EBI). Cookiecutter template + "breadcrumbs" discoverability. | **Opportunity** — join ecosystem, adopt breadcrumb standard. Zero overlap with structure prediction. |
+| **Augmented-Nature** | 20 bioinformatics MCP servers (UniProt 26-tool, PDB, AlphaFold, STRING, KEGG, ChEMBL, etc.). TypeScript. | **Low threat** — data access only, no prediction/interpretation. Complement with upstream queries. |
+| **OpenProtein.AI** | MIT-founded, free for academics. PoET models, ESMFold, AF2. Python SDK + REST API. No MCP. | **Medium** — same user demographic. No confidence/ensemble features. |
+
+#### Protocol & Infrastructure
+
+- **FastMCP 3.3.1** (May 15, 2026): `Progress` dependency injection replaces `ctx.report_progress()`. OTEL list-operation instrumentation. `fastmcp-slim` for client-only. `run_in_thread=False` opt-out. `experimental_capabilities` kwarg.
+- **FastMCP 3.2.0** "Show Don't Tool": FastMCPApp for interactive UIs. Security hardening (SSRF/path traversal prevention, JWT algo restrictions, CSRF).
+- **FastMCP 3.2.4**: BREAKING — tasks scoped to auth context, not MCP session. `ctx.elicit()` requires `response_type` (deprecation warning without it).
+- **FastMCP pin**: Current `fastmcp>=2.0.0` is dangerously loose. Pin to `>=3.3.1,<4.0.0`.
+- **MCP spec next release**: Stateless redesign (initialize handshake removed), `.well-known` discovery, agent-to-agent Tasks refinement. No firm date yet.
+- **MCP governance**: Linux Foundation AAIF. 97M monthly downloads. MCPCon Europe Sep 17-18 Amsterdam, NA Oct 22-23 San Jose.
+- **Smithery scoring**: Tool descriptions, server description, system prompt, package metadata, README quality, optional config (15pts) vs config schema (10pts). 4-indicator reliability: typed schemas, idempotency keys, explicit timeouts, per-tool quota tracking.
+- **AgentSeal 2026**: 66% of 1,808 servers had findings. 427 critical, 1,841 high. 40.1% code execution, 37.2% toxic data flows. `mcp-remote` package (437K downloads) had CVSS 9.6 command injection.
+
+#### JOSS & Publication
+
+- **JOSS requirements**: paper.md (750-1750 words), CITATION.cff, CONTRIBUTING.md, 6+ months public Git history, automated tests + CI, AI usage disclosure (mandatory), statement of need vs existing tools.
+- **Zenodo**: Reserve DOI before JOSS submission. CC-BY 4.0 for datasets. Versioned CSV/JSON with schema README. GitHub integration for auto-archiving releases.
+- **Boltz-2 CASP16 evaluation**: Still "coming soon" on GitHub. Monitor for release — direct input to benchmarking harness.
+
+### Prioritized v1.1+ extension items
+
+#### P0 — Do now
+
+1. **Pin FastMCP >=3.3.1,<4.0.0** in pyproject.toml. Current `>=2.0.0` is dangerously loose.
+2. **Migrate to Progress DI.** Replace `ctx.report_progress()` + `hasattr(ctx, 'task_id')` guards with `Progress` dependency injection pattern from FastMCP 3.x.
+3. **Add PSBench as benchmark dataset.** 1.4M annotated models — integrate as built-in evaluation set alongside CASP16/DisProt.
+4. **Create CONTRIBUTING.md.** Required for JOSS. Include contributor guide, PR process, code style, test requirements.
+
+#### P1 — Before v1.1 release
+
+5. **NVIDIA NIM REST API backend.** Add NIM endpoint to boltz2_client as alternative to CLI. Enables GPU-less cloud inference via `build.nvidia.com` or self-hosted container. PAE matrix output from v1.5+.
+6. **Design validation tool.** Accept PDB from external design tools (BindCraft, RFdiffusion3, ProteinMPNN), re-predict with Boltz-2/Protenix-v2, run confidence analysis + ensemble comparison. New tool: `validate_design`.
+7. **Response sanitization.** Sanitize API responses (AFDB, Foldseek, DisProt, MobiDB) before returning to LLM context. Prevent toxic data flow attacks.
+8. **Explicit timeouts.** Add configurable timeouts to all external API calls. Currently implicit via httpx defaults.
+9. **MCPmed breadcrumb adoption.** Add HTML-embedded JSON breadcrumb metadata for LLM discoverability per MCPmed standard.
+
+#### P2 — Before JOSS submission
+
+10. **JOSS paper.md.** 1000-1500 words: summary, statement of need, state of the field (vs ProteinMCP, AlphaFold-MCP, BioinfoMCP, FoldRun), acknowledgments, references.
+11. **Zenodo benchmark dataset.** Reserve DOI. Publish curated benchmark set (DisProt hallucination, CASP16, PSBench subset) as versioned CC-BY 4.0 dataset.
+12. **AI usage disclosure.** Document AI assistance scope for JOSS mandatory disclosure.
+13. **6 months public Git history.** Ensure public repo has been active ≥6 months before submission.
+
+#### P3 — Post-launch roadmap
+
+14. **Conformational ensemble mode.** Integrate ConforMix-Boltz for multi-state sampling. Return Boltzmann-weighted conformational populations. Feed into disagreement analysis.
+15. **Augmented-Nature cross-reference.** Recommend pairing with UniProt/PDB/STRING MCP servers for upstream annotation. Document multi-server workflows.
+16. **MCPCon Europe attendance.** Sep 17-18 Amsterdam. Present FoldCopilot as first structural biology MCP.
+17. **AAIF project submission.** Submit FoldCopilot to Linux Foundation AAIF Growth stage once maturity criteria met.
+
+### Updated competitive positioning
+
+```
+FoldCopilot (v1.0)     — 6 backends, 33 tools, confidence interpretation, IDR flagging,
+                         therapeutic verticals, ensemble disagreement, benchmarking,
+                         antibody design guidance, dual-model IDR, training provenance
+MCPmed ecosystem       — genomics/expression (GEO, STRING, UCSC). Complementary, not competing.
+Augmented-Nature       — 20 data-access MCP servers (UniProt, PDB, KEGG). No prediction/interpretation.
+ProteinMCP             — AF2-era protein engineering, no confidence/prediction
+AlphaFold-MCP-Server   — AFDB lookup only, stale (Jul 2025)
+FoldRun MCP            — Gemini demo, mock tools, no interpretation
+BioMCP/OncoMCP         — Clinical genomics, no structure prediction
+OpenProtein.AI         — No-code platform, no MCP, no confidence layer
+IsoDDE                 — Proprietary, closed, inaccessible
+```
+
 ## Caveats
 - The "94.7% success rate" of BioinfoMCP refers to classical NGS pipelines, not structure prediction; do not over-extrapolate.
 - Chai-2's antibody hit rates (16–50% depending on metric) and Boltz-2's 0.66 FEP+ correlation are developer-reported; real-world benchmarks (deepmirror.ai on DHX9 and cGAS, Bugrova et al. on SMILES vs CCD sensitivity) show mixed results — frame all reported metrics as upper-bound estimates in user-facing copy.
