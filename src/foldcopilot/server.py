@@ -39,6 +39,13 @@ v0.9: Benchmarking harness
 - Batch evaluation and publication-ready reports
 """
 
+# MCPmed breadcrumb: FoldCopilot v1.1
+# domain: structural-biology, protein-prediction, confidence-interpretation
+# tools: 34
+# backends: boltz2, openfold3, chai1, protenix, alphafold3, aqaffinity
+# data-sources: AFDB, Foldseek, DisProt, MobiDB, AlphaMissense, AlphaFill, TMalphaFold
+# complements: uniprot-mcp, pdb-mcp, string-mcp, geo-mcp
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -54,9 +61,10 @@ except ImportError:
     _TASKS_AVAILABLE = False
 
 from foldcopilot.tools import (
-    afdb, annotations, benchmarks, confidence, education, ensemble,
-    fold_drift, foldseek, notebook_export, predict, verticals,
+    afdb, annotations, benchmarks, confidence, design_validation, education,
+    ensemble, fold_drift, foldseek, notebook_export, predict, verticals,
 )
+from foldcopilot.utils.sanitize import sanitize_dict
 from foldcopilot.utils.validation import ValidationError, validate_uniprot_id, validate_pdb_content
 
 mcp = FastMCP(
@@ -191,9 +199,10 @@ async def foldseek_search(
         validate_pdb_content(pdb_content)
     except ValidationError as e:
         return {"error": str(e)}
-    return await foldseek.search_structure(
+    result = await foldseek.search_structure(
         pdb_content, databases=databases, mode=mode, max_hits=max_hits
     )
+    return sanitize_dict(result) if isinstance(result, dict) else result
 
 
 @mcp.tool()
@@ -211,9 +220,10 @@ async def foldseek_search_uniprot(
     Example: foldseek_search_uniprot("P00520") to find proteins structurally
     similar to human ABL1.
     """
-    return await foldseek.search_by_uniprot(
+    result = await foldseek.search_by_uniprot(
         uniprot_id, databases=databases, mode=mode, max_hits=max_hits
     )
+    return sanitize_dict(result) if isinstance(result, dict) else result
 
 
 @mcp.tool()
@@ -431,7 +441,8 @@ async def get_missense_landscape(
         uniprot_id = validate_uniprot_id(uniprot_id)
     except ValidationError as e:
         return {"error": str(e)}
-    return await annotations.get_missense_landscape(uniprot_id)
+    result = await annotations.get_missense_landscape(uniprot_id)
+    return sanitize_dict(result) if isinstance(result, dict) else result
 
 
 @mcp.tool()
@@ -452,7 +463,8 @@ async def get_cofactors(
         uniprot_id = validate_uniprot_id(uniprot_id)
     except ValidationError as e:
         return {"error": str(e)}
-    return await annotations.get_cofactors(uniprot_id)
+    result = await annotations.get_cofactors(uniprot_id)
+    return sanitize_dict(result) if isinstance(result, dict) else result
 
 
 @mcp.tool()
@@ -555,6 +567,31 @@ async def design_antibody(
     except ValidationError as e:
         return {"error": str(e)}
     return await verticals.antibody_design_guidance(target_uniprot_id, format)
+
+
+@mcp.tool()
+async def validate_design(
+    pdb_content: Annotated[str, "PDB format string of the designed protein structure"],
+    design_tool: Annotated[str, "Design tool used: 'bindcraft', 'rfdiffusion3', 'proteinmpnn', 'ligandmpnn', or other"] = "unknown",
+    design_intent: Annotated[str, "What the design is intended for (e.g., 'EGFR binder', 'enzyme scaffold')"] = "",
+) -> dict:
+    """Validate a protein design by analyzing structural confidence quality.
+
+    Accepts PDB output from external design tools (BindCraft, RFdiffusion3,
+    ProteinMPNN, LigandMPNN) and assesses design quality via confidence analysis.
+    Returns per-residue confidence distribution, low-confidence regions,
+    quality verdict (high/moderate/low), and tool-specific design guidance.
+
+    Use this after running a protein design pipeline to check if the designed
+    structure is likely to fold correctly before experimental validation.
+
+    Example: validate_design(pdb_string, "bindcraft", "binder for EGFR ectodomain")
+    """
+    try:
+        pdb_content = validate_pdb_content(pdb_content)
+    except ValidationError as e:
+        return {"error": str(e)}
+    return design_validation.validate_design(pdb_content, design_tool, design_intent)
 
 
 # --- Education Mode (v0.8) ---
@@ -855,7 +892,7 @@ def health() -> dict:
     try:
         tools_count = len(mcp._tool_manager._tools)
     except Exception:
-        tools_count = 33  # fallback to known count
+        tools_count = 34  # fallback to known count
 
     return {
         "status": "healthy",

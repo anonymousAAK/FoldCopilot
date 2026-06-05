@@ -21,6 +21,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from foldcopilot.models.prediction import (
     JobStatus,
     PredictionInput,
@@ -278,3 +280,87 @@ def _check_gpu() -> bool:
         return torch.cuda.is_available()
     except ImportError:
         return False
+
+
+async def predict_nim(
+    prediction_input: PredictionInput,
+    nim_endpoint: str = "https://health.api.nvidia.com/v1/biology/mit/boltz-2",
+    api_key: str | None = None,
+) -> PredictionResult:
+    """Run Boltz-2 prediction via NVIDIA NIM REST API.
+
+    Alternative to local CLI — enables GPU-less cloud inference.
+    Requires NVIDIA API key (env: NVIDIA_API_KEY or passed directly).
+    NIM v1.5+ returns PAE matrix in response.
+    """
+    key = api_key or os.environ.get("NVIDIA_API_KEY")
+    if not key:
+        return PredictionResult(
+            job_id=f"nim-{int(time.time())}",
+            status=JobStatus.FAILED,
+            backend="boltz2-nim",
+            sequences=prediction_input.sequences,
+            error_message="NVIDIA_API_KEY not set. Get one at build.nvidia.com",
+        )
+
+    start_time = time.time()
+    job_id = f"nim-{int(time.time())}"
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        payload = {
+            "sequences": prediction_input.sequences,
+            "diffusion_samples": prediction_input.diffusion_samples,
+            "recycling_steps": prediction_input.recycling_steps,
+            "sampling_steps": prediction_input.sampling_steps,
+        }
+        resp = await client.post(
+            nim_endpoint,
+            json=payload,
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        )
+        if resp.status_code != 200:
+            return PredictionResult(
+                job_id=job_id,
+                status=JobStatus.FAILED,
+                backend="boltz2-nim",
+                sequences=prediction_input.sequences,
+                error_message=f"NIM API error {resp.status_code}: {resp.text[:500]}",
+                elapsed_seconds=round(time.time() - start_time, 1),
+            )
+
+        data = resp.json()
+        elapsed = time.time() - start_time
+
+        manifest = ReproducibilityManifest.create(
+            backend="boltz2-nim",
+            sequences=prediction_input.sequences,
+            parameters={
+                "diffusion_samples": prediction_input.diffusion_samples,
+                "recycling_steps": prediction_input.recycling_steps,
+                "sampling_steps": prediction_input.sampling_steps,
+                "nim_endpoint": nim_endpoint,
+            },
+            training_data_source="Boltz-2 (Passaro et al., bioRxiv 2025.06.14.659707)",
+        )
+
+        return PredictionResult(
+            job_id=job_id,
+            status=JobStatus.COMPLETE,
+            backend="boltz2-nim",
+            sequences=prediction_input.sequences,
+            mean_plddt=data.get("mean_plddt"),
+            predicted_tm_score=data.get("predicted_tm_score"),
+            predicted_affinity=data.get("predicted_affinity"),
+            manifest=manifest,
+            elapsed_seconds=round(elapsed, 1),
+        )
+
+
+def get_nim_status() -> dict:
+    """Check NVIDIA NIM Boltz-2 API availability."""
+    has_key = bool(os.environ.get("NVIDIA_API_KEY"))
+    return {
+        "available": has_key,
+        "endpoint": "https://health.api.nvidia.com/v1/biology/mit/boltz-2",
+        "setup": "Set NVIDIA_API_KEY environment variable. Get key at build.nvidia.com" if not has_key else "API key configured",
+    }

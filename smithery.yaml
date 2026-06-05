@@ -1,18 +1,22 @@
 # Smithery configuration for FoldCopilot
+# Confidence-aware interpretation copilot for protein structure predictions
 # https://smithery.ai
 
 startCommand:
   type: stdio
   configSchema:
     type: object
-    properties: {}
+    properties:
+      NVIDIA_API_KEY:
+        type: string
+        description: "Optional NVIDIA NIM API key for cloud Boltz-2 inference"
+      OTEL_EXPORTER_OTLP_ENDPOINT:
+        type: string
+        description: "Optional OpenTelemetry endpoint for observability"
+    required: []
   commandFunction:
     command: python
     args:
       - "-m"
       - "foldcopilot.server"
     env: {}
-
-build:
-  dockerfile: null
-  dockerBuildPath: null

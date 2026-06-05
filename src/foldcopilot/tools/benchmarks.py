@@ -59,6 +59,17 @@ BENCHMARK_DATASETS = {
         "size": None,  # varies
         "type": "structure_accuracy",
     },
+    "psbench": {
+        "name": "PSBench",
+        "description": (
+            "1.4M annotated protein structure models with global, local, "
+            "and interface quality scores (U Missouri, Feb 2026)"
+        ),
+        "source": "https://github.com/BioinfoMachineLearning/PSBench",
+        "categories": ["global_quality", "local_quality", "interface_quality"],
+        "size": "1.4M models",
+        "type": "structure_quality",
+    },
     "custom": {
         "name": "Custom Dataset",
         "description": "User-provided PDB pairs for benchmarking.",
