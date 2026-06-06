@@ -11,11 +11,9 @@ Supports:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
 import shutil
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -57,7 +55,7 @@ def _write_input_yaml(
     lines = ["version: 1", "sequences:"]
     for i, seq in enumerate(sequences):
         chain_id = chr(65 + i)
-        lines.append(f"  - protein:")
+        lines.append("  - protein:")
         lines.append(f"      id: {chain_id}")
         lines.append(f"      sequence: {seq}")
 

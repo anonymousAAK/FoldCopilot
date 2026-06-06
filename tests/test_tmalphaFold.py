@@ -1,6 +1,5 @@
 """Tests for TMalphaFold client — membrane orientation data."""
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -8,7 +7,6 @@ import pytest
 from foldcopilot.clients.tmalphaFold_client import (
     get_membrane_context,
     get_membrane_topology,
-    get_opm_orientation,
 )
 
 

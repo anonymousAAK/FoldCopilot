@@ -7,7 +7,6 @@ No existing MCP wrapper for Foldseek exists as of May 2026.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 from pathlib import Path
 from typing import Any

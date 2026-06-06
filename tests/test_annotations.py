@@ -1,6 +1,5 @@
 """Tests for AlphaMissense and AlphaFill annotation tools."""
 
-import pytest
 
 from foldcopilot.clients.alphamissense_client import (
     _classify_score,

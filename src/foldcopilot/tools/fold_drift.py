@@ -8,9 +8,7 @@ currently installed.
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
-from typing import Any
 
 PREDICTION_DIR = Path.home() / ".cache" / "foldcopilot" / "predictions"
 

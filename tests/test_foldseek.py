@@ -1,6 +1,5 @@
 """Tests for Foldseek client and tools."""
 
-import pytest
 
 from foldcopilot.clients.foldseek_client import parse_alignments
 from foldcopilot.tools.foldseek import _extract_uniprot_from_target

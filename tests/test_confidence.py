@@ -1,7 +1,5 @@
 """Tests for confidence interpretation logic."""
 
-import numpy as np
-import pytest
 
 from foldcopilot.models.confidence import ConfidenceBucket, ConfidenceReport
 from foldcopilot.tools.confidence import (

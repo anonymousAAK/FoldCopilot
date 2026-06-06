@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 
 from foldcopilot.tools.fold_drift import (
     check_fold_drift,

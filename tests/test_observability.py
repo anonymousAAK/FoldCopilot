@@ -49,7 +49,7 @@ def test_module_loads_without_otel():
 
 def test_trace_tool_noop():
     """trace_tool context manager must work as a no-op without OTel."""
-    from foldcopilot.observability import trace_tool, _NoOpSpan
+    from foldcopilot.observability import trace_tool
 
     # Even if OTel IS installed, the context manager should still work.
     with trace_tool("test_tool", {"key": "value"}) as span:
@@ -127,7 +127,7 @@ def test_setup_tracing_noop_without_otel():
 
 def test_setup_tracing_does_not_crash_with_otel():
     """setup_tracing must not crash when OTel IS installed (if present)."""
-    from foldcopilot.observability import is_otel_available, setup_tracing
+    from foldcopilot.observability import setup_tracing
 
     # This test only validates no crash — doesn't require OTel installed.
     # If OTel is installed, it configures a real provider; if not, it no-ops.

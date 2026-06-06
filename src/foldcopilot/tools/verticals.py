@@ -10,7 +10,7 @@ from __future__ import annotations
 from foldcopilot.clients import (
     afdb_client, alphafill_client, alphamissense_client, tmalphaFold_client,
 )
-from foldcopilot.tools import confidence, foldseek
+from foldcopilot.tools import confidence
 
 
 async def antibody_analysis(

@@ -107,7 +107,7 @@ def validate_pdb_content(pdb_content: str) -> str:
         raise ValidationError("PDB content cannot be empty.")
 
     lines = pdb_content.strip().splitlines()
-    atom_lines = [l for l in lines if l.startswith(("ATOM", "HETATM"))]
+    atom_lines = [line for line in lines if line.startswith(("ATOM", "HETATM"))]
 
     if not atom_lines:
         raise ValidationError(

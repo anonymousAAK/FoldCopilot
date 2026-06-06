@@ -1,6 +1,5 @@
 """Tests for education mode — plain-language explanations."""
 
-import pytest
 
 from foldcopilot.tools.education import (
     explain_confidence_report,

@@ -1,10 +1,8 @@
 """Tests for Protenix prediction client helpers."""
 
 import json
-from pathlib import Path
 from textwrap import dedent
 
-import pytest
 
 from foldcopilot.clients.protenix_client import (
     _parse_output,

@@ -1,9 +1,6 @@
 """Tests for benchmarking harness."""
 
-from textwrap import dedent
 
-import numpy as np
-import pytest
 
 from foldcopilot.tools.benchmarks import (
     _accuracy_by_plddt_bucket,

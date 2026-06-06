@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
 
 
 def _make_cell(cell_type: str, source: str | list[str]) -> dict:
@@ -53,7 +52,7 @@ def export_confidence_notebook(
         ]),
         _make_cell("markdown", "## 1. Fetch pLDDT scores from AlphaFold DB\n"),
         _make_cell("code", [
-            f'url = f"https://alphafold.ebi.ac.uk/api/prediction/{{UNIPROT_ID}}"\n',
+            'url = f"https://alphafold.ebi.ac.uk/api/prediction/{UNIPROT_ID}"\n',
             "resp = httpx.get(url)\n",
             "resp.raise_for_status()\n",
             "metadata = resp.json()[0]\n",

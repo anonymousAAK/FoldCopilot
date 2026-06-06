@@ -1,7 +1,6 @@
 """Tests for prediction models, license routing, and Boltz-2 client helpers."""
 
 import json
-from pathlib import Path
 from textwrap import dedent
 
 import pytest

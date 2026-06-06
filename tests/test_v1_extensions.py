@@ -3,7 +3,6 @@ confidence report fields, and Protenix backend support."""
 
 from __future__ import annotations
 
-import pytest
 
 from foldcopilot.tools.confidence import _extract_af2_disorder_regions
 from foldcopilot.models.prediction import (
