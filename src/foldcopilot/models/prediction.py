@@ -71,7 +71,7 @@ class ReproducibilityManifest(BaseModel):
     runtime_env: dict[str, str]
     gpu_type: str | None = None
     timestamp_utc: float
-    foldcopilot_version: str = "0.1.0"
+    foldcopilot_version: str = "1.1.0"
 
     @classmethod
     def create(
