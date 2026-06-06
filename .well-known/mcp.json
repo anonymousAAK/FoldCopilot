@@ -2,7 +2,7 @@
   "name": "FoldCopilot",
   "description": "Confidence-aware interpretation copilot for protein structure predictions. 6 backends (Boltz-2, OpenFold3, Chai-1, Protenix-v2, AF3, AQAffinity), 34 MCP tools spanning confidence assessment, structural search, prediction, ensemble comparison, annotations, therapeutic verticals, design validation, education, and benchmarking.",
   "version": "1.0.0",
-  "repository": "https://github.com/your-username/foldcopilot",
+  "repository": "https://github.com/anonymousAAK/FoldCopilot",
   "license": "MIT",
   "author": "FoldCopilot Contributors",
   "tags": ["protein", "structure-prediction", "alphafold", "bioinformatics", "drug-discovery", "confidence", "boltz2", "openfold3"],
